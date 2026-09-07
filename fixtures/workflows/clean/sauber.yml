@@ -1,0 +1,17 @@
+# Absichtlich sauber. Der Workflow-Bot darf hier nichts finden.
+# Der SHA ist erfunden und als solcher erkennbar -- das ist ein Fixture,
+# keine Aussage darueber, welcher Commit hinter einem Tag steht.
+name: sauber
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567 # v4
+      - name: Titel ausgeben
+        env:
+          TITEL: ${{ github.event.pull_request.title }}
+        run: echo "$TITEL"

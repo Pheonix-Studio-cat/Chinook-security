@@ -1,0 +1,81 @@
+name: "Chinook Secret-Bot"
+description: >-
+  Sucht Geheimnisse im Arbeitsbaum und wahlweise in der Git-History.
+  Gibt den gefundenen Wert nie aus -- gemeldet werden Ort, Typ und Laenge.
+author: "PHÖNIX STUDIO"
+
+inputs:
+  path:
+    description: "Wurzel des zu pruefenden Verzeichnisses."
+    required: false
+    default: "."
+  exclude:
+    description: "Pfade, die uebersprungen werden, kommagetrennt."
+    required: false
+    default: ""
+  history:
+    description: "Zusaetzlich die Git-History pruefen. Braucht fetch-depth: 0 beim Checkout."
+    required: false
+    default: "false"
+  fail-on:
+    description: "Ab welchem Schweregrad der Schritt fehlschlaegt: critical, high, medium, low, info oder never."
+    required: false
+    default: "high"
+  report:
+    description: "Wohin der JSON-Bericht geschrieben wird."
+    required: false
+    default: "chinook-secret-bot.json"
+  sarif:
+    description: "Wohin der SARIF-Bericht geschrieben wird. Leer lassen, um keinen zu schreiben."
+    required: false
+    default: "chinook-secret-bot.sarif"
+
+outputs:
+  report:
+    description: "Pfad des JSON-Berichts."
+    value: ${{ steps.lauf.outputs.report }}
+  total:
+    description: "Anzahl der Befunde."
+    value: ${{ steps.lauf.outputs.total }}
+
+runs:
+  using: composite
+  steps:
+    - id: lauf
+      shell: bash
+      # Die Eingaben gehen ueber `env` in das Skript, nicht ueber `${{ }}` im
+      # Skripttext. Genau das prueft der Workflow-Bot bei anderen -- hier gilt es
+      # zuerst fuer uns selbst.
+      env:
+        CHINOOK_PATH: ${{ inputs.path }}
+        CHINOOK_EXCLUDE: ${{ inputs.exclude }}
+        CHINOOK_HISTORY: ${{ inputs.history }}
+        CHINOOK_FAIL_ON: ${{ inputs.fail-on }}
+        CHINOOK_REPORT: ${{ inputs.report }}
+        CHINOOK_SARIF: ${{ inputs.sarif }}
+        PYTHONPATH: ${{ github.action_path }}/../..
+      run: |
+        set -euo pipefail
+        argumente=(secret-bot --path "$CHINOOK_PATH" --fail-on "$CHINOOK_FAIL_ON")
+        if [ -n "$CHINOOK_EXCLUDE" ]; then
+          argumente+=(--exclude "$CHINOOK_EXCLUDE")
+        fi
+        if [ "$CHINOOK_HISTORY" = "true" ]; then
+          argumente+=(--history)
+        fi
+        if [ -n "$CHINOOK_REPORT" ]; then
+          argumente+=(--json "$CHINOOK_REPORT")
+        fi
+        if [ -n "$CHINOOK_SARIF" ]; then
+          argumente+=(--sarif "$CHINOOK_SARIF")
+        fi
+        echo "report=$CHINOOK_REPORT" >> "$GITHUB_OUTPUT"
+        status=0
+        python3 -m chinook.cli "${argumente[@]}" || status=$?
+        if [ -f "$CHINOOK_REPORT" ]; then
+          gesamt=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["summary"]["total"])' "$CHINOOK_REPORT")
+        else
+          gesamt=0
+        fi
+        echo "total=$gesamt" >> "$GITHUB_OUTPUT"
+        exit "$status"
