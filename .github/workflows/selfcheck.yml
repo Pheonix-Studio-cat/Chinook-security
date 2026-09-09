@@ -58,27 +58,6 @@ jobs:
           fail-on: medium
           sarif: ""
 
-  # Der aufrufbare Workflow, lokal aufgerufen. Hier ist `job_workflow_sha` leer
-  # -- nachgewiesen, nicht vermutet -- und der Workflow nimmt den Quelltext, der
-  # schon im Arbeitsverzeichnis liegt. Damit prueft dieser Job die Fassung
-  # **dieses** Pull Requests.
-  aufrufbarer-workflow-lokal:
-    uses: ./.github/workflows/license-bot.yml
-    with:
-      fail-on: medium
-
-  # Derselbe Workflow, aber **von aussen** aufgerufen -- der Weg, den ein fremdes
-  # Repo geht. Nur so laesst sich pruefen, ob `job_workflow_sha` dort gesetzt ist
-  # und das Nachladen greift; beim lokalen Aufruf oben ist der Wert leer.
-  #
-  # Auf einen Commit festgelegt, wie es der Workflow-Bot von jedem verlangt --
-  # er hat diese Zeile beim ersten Entwurf prompt als `unpinned-action` gemeldet,
-  # als sie noch auf den Branch zeigte.
-  aufrufbarer-workflow-von-aussen:
-    uses: Pheonix-Studio-cat/Chinook-security/.github/workflows/license-bot.yml@5fd0e6a498a8a6906b5e1ddd8d94410c66fbe82d
-    with:
-      fail-on: medium
-
   # Der einzige Schritt, der an einem fremden Dienst haengt. Er darf fehlschlagen,
   # ohne den Lauf zu kippen: er ist **Auskunft** darueber, ob OSV gerade
   # antwortet, keine Zusicherung ueber Chinook. Die Bot-Logik selbst wird in

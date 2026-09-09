@@ -15,7 +15,8 @@ wird gemeldet.
 ## Stand
 
 Gebaut sind Etappe 1 und 2: das gemeinsame Befund-Format, **fünf Bots**, die
-Gegenprobe, und aufrufbare Workflows für den Einbau mit einer Zeile.
+Gegenprobe, und je eine composite action pro Bot für den Einbau in fremde
+Repos.
 
 | Teil | Zustand |
 | --- | --- |
@@ -25,7 +26,7 @@ Gegenprobe, und aufrufbare Workflows für den Einbau mit einer Zeile.
 | **Dependency-Bot** | ✅ Sperrdateien gegen OSV.dev |
 | **Code-Bot** | ✅ 12 Muster in Python, JavaScript, Shell |
 | **Lizenz-Bot** | ✅ was fehlt und was auseinandergeht |
-| Aufrufbare Workflows | ✅ eine Zeile je Bot |
+| Composite Action je Bot | ✅ auch aus fremden Repos nachgewiesen |
 | Gegenprobe | ✅ 20 Mutationen, alle gefangen |
 | Aufseher (KI-Schicht) | ⏳ Etappe 3 |
 | Website | ⏳ Etappe 4 |
@@ -40,45 +41,50 @@ Angriffsfläche, und ein Lockfile will gepflegt werden.
 
 ## Einbauen
 
-In das zu prüfende Repo, als `.github/workflows/chinook.yml`. Jeder Bot ist
-**ein aufrufbarer Workflow** — eine Zeile, kein eigener Checkout:
+In das zu prüfende Repo, als `.github/workflows/chinook.yml`:
 
 ```yaml
 name: Chinook
 on: [pull_request]
 
+permissions:
+  contents: read
+
 jobs:
-  geheimnisse:
-    uses: Pheonix-Studio-cat/Chinook-security/.github/workflows/secret-bot.yml@main
-  workflows:
-    uses: Pheonix-Studio-cat/Chinook-security/.github/workflows/workflow-bot.yml@main
-  abhaengigkeiten:
-    uses: Pheonix-Studio-cat/Chinook-security/.github/workflows/dependency-bot.yml@main
-  quelltext:
-    uses: Pheonix-Studio-cat/Chinook-security/.github/workflows/code-bot.yml@main
-  lizenzen:
-    uses: Pheonix-Studio-cat/Chinook-security/.github/workflows/license-bot.yml@main
-```
-
-Der aufrufbare Workflow holt Chinook in **genau der Fassung**, die hinter dem
-`@` steht — über `github.job_workflow_sha`. Ist die leer, bricht er ab, statt
-stillschweigend irgendeine Fassung zu holen.
-
-Wer die Bots als einzelne Schritte in einem eigenen Job braucht, nimmt
-stattdessen die composite actions:
-
-```yaml
+  sicherheit:
+    runs-on: ubuntu-latest
+    steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0          # nur nötig für die History-Prüfung
+
       - uses: Pheonix-Studio-cat/Chinook-security/actions/secret-bot@main
         with:
           history: "true"
+      - uses: Pheonix-Studio-cat/Chinook-security/actions/workflow-bot@main
+      - uses: Pheonix-Studio-cat/Chinook-security/actions/dependency-bot@main
+      - uses: Pheonix-Studio-cat/Chinook-security/actions/code-bot@main
+      - uses: Pheonix-Studio-cat/Chinook-security/actions/license-bot@main
 ```
 
 > ⚠️ `@main` ist zum Ausprobieren. Für den Dauerbetrieb auf einen Commit-SHA
 > festlegen — genau das, was der Workflow-Bot bei jeder anderen Action
 > anmahnt. Sobald es einen `v1`-Tag gibt, steht er hier.
+
+**Warum composite actions und keine aufrufbaren Workflows?** Ein aufrufbarer
+Workflow (`uses: …/secret-bot.yml@v1`) wäre eine Zeile statt vier. Er müsste
+aber wissen, welche Fassung von Chinook er nachladen soll — und dafür gibt es
+keinen brauchbaren Wert: `github.job_workflow_sha` war in allen drei geprüften
+Fällen leer (lokaler Aufruf, Aufruf über den vollen Pfad im selben Repo, Aufruf
+aus einem fremden Repo). Ohne den Wert bliebe nur ein fest verdrahteter Ref,
+der dann nicht mehr dem `@…` des Aufrufers entspricht: der Bot käme aus einer
+anderen Fassung, als der Nutzer festgelegt hat, und niemand würde es merken.
+
+Eine composite action hat das Problem nicht. Sie findet ihren eigenen Quelltext
+über `github.action_path`, und der liegt in **genau** der Fassung hinter dem
+`@`. Vier Zeilen mehr, dafür stimmt die Fassung. Nachgewiesen: das
+Gedächtnis-Repo des Projektinhabers bindet den Secret-Bot so ein, aus einem
+anderen — und privaten — Repo heraus.
 
 ### Rückgabewerte
 
@@ -222,7 +228,7 @@ chinook/            die Bots, nur Standardbibliothek
   secret_bot.py  workflow_bot.py  dependency_bot.py  code_bot.py  license_bot.py
   cli.py            python3 -m chinook.cli <bot> …
 actions/            je ein composite action pro Bot
-.github/workflows/  je ein aufrufbarer Workflow pro Bot, dazu die Selbstprüfung
+.github/workflows/  die Selbstprüfung
 checks/             Prüfungen und die Gegenprobe
 fixtures/workflows/ absichtlich kaputte Workflows — außerhalb von
                     .github/workflows, damit GitHub sie nicht ausführt

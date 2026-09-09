@@ -99,12 +99,9 @@ gefunden. Die Regeln stehen vollständig in `chinook/secret_bot.py` und
 - Für die History-Prüfung muss der Checkout `fetch-depth: 0` setzen.
 - `python3` wird als vorhanden vorausgesetzt (auf `ubuntu-latest` ist es das).
 
-## Aufrufbare Workflows
+## Es gibt keine aufrufbaren Workflows
 
-- Sie holen Chinook ueber `github.job_workflow_sha` -- den Commit der
-  Workflow-Datei, die aufgerufen wurde. Ist der leer, **bricht der Lauf ab**,
-  statt eine beliebige Fassung zu holen.
-- Sie checken das aufrufende Repo mit `fetch-depth: 0` aus, wenn der Bot die
-  History braucht (Secret-Bot), sonst flach.
-- Sie schliessen `.chinook` aus der Pruefung aus -- das ist unser eigener
-  Quelltext im Arbeitsverzeichnis des Aufrufers, nicht seiner.
+Nur composite actions. Der aufrufende Workflow muss also **selbst auschecken**
+und die Bots als Schritte einbauen -- vier Zeilen statt einer. Der Grund steht
+in `entscheidungen.md`: ein aufrufbarer Workflow käme nicht an die Fassung
+heran, die der Aufrufer gewählt hat.

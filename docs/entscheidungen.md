@@ -31,26 +31,39 @@ gegengeprüft.
 
 ---
 
-## Aufrufbare Workflows: `job_workflow_sha` statt eines verdrahteten Refs
+## Composite actions statt aufrufbarer Workflows — mit Beleg
 
-Eine composite action findet ihren eigenen Quelltext über
-`${{ github.action_path }}`. Ein aufrufbarer Workflow nicht: `actions/checkout`
-holt dort das Repo des **Aufrufers**. Der erste Entwurf hätte Chinook auf einem
-**fest verdrahteten Ref** ein zweites Mal ausgecheckt — der dann nicht mehr dem
-entspräche, was der Aufrufer mit `@v1` gewählt hat.
+Ein aufrufbarer Workflow wäre für den Nutzer eine Zeile statt vier. Er scheitert
+an einer einfachen Frage: **welche Fassung von Chinook lädt er nach?**
 
-Die Antwort ist `github.job_workflow_sha`: der Commit **genau der
-Workflow-Datei, die aufgerufen wurde**. Damit stimmt die geholte Fassung mit
-dem `@…` des Aufrufers überein.
+`actions/checkout` holt in einem aufrufbaren Workflow das Repo des *Aufrufers*,
+nicht das eigene. Der Wert dafür wäre `github.job_workflow_sha` — der Commit
+genau der Workflow-Datei, die aufgerufen wurde. Er war in **allen drei
+geprüften Fällen leer**:
 
-**Und wenn der Wert leer ist, bricht der Lauf ab.** Ein leerer `ref` würde
-sonst stillschweigend den Standard-Branch holen — grün, aber nicht die Fassung,
-die jemand gewählt hat. Genau die Sorte stiller Fehler, gegen die dieses
-Projekt gebaut ist. Ein Job der Selbstprüfung ruft einen dieser Workflows auf;
-damit ist es gefahren, nicht behauptet.
+| Fall | `job_workflow_sha` |
+| --- | --- |
+| `uses: ./.github/workflows/license-bot.yml` (lokal) | leer |
+| `uses: Pheonix-Studio-cat/Chinook-security/…@<sha>` aus demselben Repo | leer |
+| Aufruf aus einem **anderen** Repo | leer |
 
-Beide Wege bleiben: der Workflow für den Einbau mit einer Zeile, die composite
-action für den, der die Bots als Schritte in seinen eigenen Job stellen will.
+Der dritte Fall ist der entscheidende, und er ließ sich nur von aussen prüfen:
+das Gedächtnis-Repo des Projektinhabers hat den Workflow aufgerufen, und der
+Schritt „Fassung feststellen" brach ab.
+
+Ohne den Wert bliebe ein **fest verdrahteter Ref**. Dann käme der Bot aus einer
+anderen Fassung als der, die der Nutzer mit `@…` festgelegt hat — grün, und
+falsch, und niemand merkt es. Genau die Sorte stiller Fehler, gegen die dieses
+Projekt gebaut ist. Also: keine aufrufbaren Workflows.
+
+Eine composite action hat das Problem nicht: `github.action_path` zeigt auf den
+Quelltext in genau der Fassung hinter dem `@`. Vier Zeilen statt einer, dafür
+stimmt die Fassung. Nachgewiesen aus einem fremden — und privaten — Repo.
+
+**Der Wächter war die Arbeit wert.** Ein leerer `ref` hätte `actions/checkout`
+stillschweigend den Standard-Branch holen lassen. Stattdessen brach der Lauf ab
+und sagte, warum. Ohne diese fünf Zeilen wäre die Bauart als „funktioniert"
+durchgegangen.
 
 ---
 
