@@ -118,6 +118,58 @@ Bot meldete sich prompt selbst — sieben Treffer in der eigenen Regeltabelle.
 
 ---
 
+## Der Aufseher darf einordnen, nie entfernen — und das steht im Code, nicht im Prompt
+
+Die Zusicherung „kein Befund geht verloren" hängt **nicht** daran, dass das
+Modell sich an den Systemtext hält. Sie hängt daran, wie `verbinde()` gebaut
+ist: die Ergebnisliste entsteht aus den **Befunden**, nie aus der Antwort.
+
+Was das Modell schickt, wird gegen die Liste der übergebenen Fingerabdrücke
+geprüft und gegen die vier erlaubten Einschätzungen. Alles andere fällt weg.
+Ein Modell, das „geloescht" zurückgibt oder einen Befund erfindet, erreicht
+damit genau nichts.
+
+Der Systemtext sagt dasselbe — aber er ist die Bitte, nicht die Zusicherung.
+Sechs Prüfungen fahren die Angriffe (leere Antwort, zu wenige Einträge,
+erfundener Fingerabdruck, erfundene Einschätzung, Müll in der Liste,
+Steuerzeichen), und fünf Mutationen halten sie fest.
+
+---
+
+## Der Aufseher endet mit `0`, wenn er nicht laufen konnte — anders als der Dependency-Bot
+
+Beim Dependency-Bot heisst ein misslungener Abruf `2`: „der Lauf beweist
+nichts". Beim Aufseher heisst er `0`. Das ist kein Widerspruch.
+
+Der Dependency-Bot **fällt ein Urteil** — gibt es bekannte Schwachstellen oder
+nicht. Ohne Antwort hat er keines, und ein grüner Haken wäre eine Lüge.
+
+Der Aufseher fällt **keins**. Die Bots haben ihres bereits gefällt, ihre
+Rückgabewerte stehen, und ihre Befunde stehen unverändert im Bericht. Was
+fehlt, ist die Sortierhilfe. Der Bericht sagt das ausdrücklich
+(`aufseher.status`), statt es zu verschweigen.
+
+Wer ohne Einordnung nicht weitermachen will, nimmt `--require`; dann ist es
+eine `2`. Eine Mutation prüft, dass `--require` auch wirkt.
+
+---
+
+## Der Aufseher spricht die Anthropic-Messages-API
+
+Eine Form, nicht zwei. Zwei Anbieter-Formen hiessen zwei Code-Pfade, und ein
+zweiter Pfad, der nur halb geprüft ist, ist schlechter als keiner.
+
+Standardmodell ist `claude-opus-5`. `--model` und `--api-url` sind da, weil man
+sie zum Prüfen braucht und weil ein anderes Anthropic-Modell eine Zeile
+Änderung sein soll. Ein Anbieter mit anderer Request-Form braucht mehr — das
+steht als Grenze in `grenzen.md` und als offener Punkt da, nicht als
+Halbimplementierung im Code.
+
+Kein SDK: die Abhängigkeitsfreiheit gilt auch hier. Der Aufruf ist ein
+`urllib`-POST.
+
+---
+
 ## Der Aufseher zahlt nicht auf ein fremdes Konto
 
 Der Modellschlüssel kommt aus dem Repo-Secret dessen, der den Bot einsetzt —

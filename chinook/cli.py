@@ -10,7 +10,7 @@ import os
 import sys
 
 from . import findings as fmt
-from . import code_bot, dependency_bot, license_bot, secret_bot, workflow_bot
+from . import code_bot, dependency_bot, license_bot, overseer, secret_bot, workflow_bot
 
 BOTS = {
     "secret-bot": secret_bot,
@@ -43,7 +43,11 @@ def build_parser() -> argparse.ArgumentParser:
         prog="chinook",
         description="Chinook -- Sicherheits-Bots fuer GitHub-Repos.",
     )
-    parser.add_argument("bot", choices=sorted(BOTS), help="welcher Bot laufen soll")
+    parser.add_argument(
+        "bot",
+        choices=sorted([*BOTS, "overseer"]),
+        help="welcher Bot laufen soll (oder `overseer` zum Einordnen)",
+    )
     parser.add_argument("--path", default=".", help="Wurzel des zu pruefenden Repos")
     parser.add_argument("--exclude", default="", help="Pfade, kommagetrennt")
     parser.add_argument(
@@ -65,6 +69,31 @@ def build_parser() -> argparse.ArgumentParser:
         help="Zeitgrenze der OSV-Abfrage in Sekunden (nur dependency-bot)",
     )
     parser.add_argument(
+        "--report",
+        dest="reports",
+        action="append",
+        default=[],
+        help="Befundbericht, den der Aufseher einordnen soll (mehrfach moeglich)",
+    )
+    parser.add_argument(
+        "--api-url",
+        default=overseer.API_URL,
+        help="Adresse der Messages-API (nur overseer; fuer Pruefungen)",
+    )
+    parser.add_argument(
+        "--model", default=overseer.MODEL, help="Modell fuer den Aufseher"
+    )
+    parser.add_argument(
+        "--require",
+        action="store_true",
+        help="den Lauf mit 2 beenden, wenn der Aufseher nicht laufen konnte",
+    )
+    parser.add_argument(
+        "--no-fallbacks",
+        action="store_true",
+        help="ohne serverseitigen Modell-Rueckfall anfragen (nur overseer)",
+    )
+    parser.add_argument(
         "--fail-on",
         default="high",
         choices=(*fmt.SEVERITIES, "never"),
@@ -82,8 +111,54 @@ def _write(path: str, payload: dict) -> None:
         handle.write("\n")
 
 
+def _aufseher(args) -> int:
+    """Der Aufseher faellt kein Urteil -- er ordnet ein.
+
+    Deshalb beendet er sich mit 0, auch wenn er nicht laufen konnte: die
+    Befunde der Bots stehen unveraendert, und deren Rueckgabewerte haben das
+    Urteil bereits gefaellt. Wer das anders haben will, nimmt `--require`.
+    """
+    if not args.reports:
+        print("overseer: --report fehlt (mindestens ein Befundbericht)", file=sys.stderr)
+        return UNBEWIESEN
+
+    ergebnis, gelaufen = overseer.run(
+        args.reports,
+        url=args.api_url,
+        modell=args.model,
+        fallbacks=not args.no_fallbacks,
+    )
+    if args.json_out:
+        _write(args.json_out, ergebnis)
+
+    stand = ergebnis["aufseher"]
+    print(f"overseer: {stand['status']}")
+    if stand["grund"]:
+        print(f"  {stand['grund']}")
+    if gelaufen:
+        print(f"  {stand['bewertete']} von {ergebnis['summary']['total']} Befund(en) eingeordnet")
+        print(f"  Modell: {stand['modell']}")
+        for befund in ergebnis["findings"]:
+            triage = befund.get("triage")
+            if triage:
+                ort = befund.get("location", {})
+                print(
+                    f"  [{triage['einschaetzung']}] {ort.get('path')}:{ort.get('line')} "
+                    f"{befund.get('rule')}"
+                )
+    if not gelaufen and args.require:
+        print(
+            "\nFehlgeschlagen: --require verlangt eine Einschaetzung, es gibt keine.",
+            file=sys.stderr,
+        )
+        return UNBEWIESEN
+    return OK
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
+    if args.bot == "overseer":
+        return _aufseher(args)
     module = BOTS[args.bot]
     excludes = _split(args.exclude)
 

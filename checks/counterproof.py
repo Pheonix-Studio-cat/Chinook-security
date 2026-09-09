@@ -5,12 +5,18 @@ die nichts beweist. Dagegen hilft nur eins: den Bot absichtlich kaputt machen
 und verlangen, dass die Pruefungen **rot** werden. Bleiben sie gruen, ist die
 Pruefung wertlos, und dieses Skript sagt das laut.
 
-Aufruf:  python3 -m checks.counterproof
+Aufruf:  python3 -m checks.counterproof [--json datei]
 Rueckgabe: 0, wenn jede Mutation gefangen wurde. Sonst 1.
+
+Mit `--json` schreibt sie das Ergebnis maschinenlesbar mit -- das ist die
+zweite Aufgabe des Aufsehers: nicht nur Befunde einordnen, sondern **die Bots
+kontrollieren**. Die Website zeigt daraus, welche Pruefung gegengeprueft ist.
 """
 
 from __future__ import annotations
 
+import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -174,6 +180,41 @@ MUTATIONEN: tuple[Mutation, ...] = (
         neu="                if False:",
         trifft="ein Lizenzverweis ins Leere gilt als in Ordnung",
     ),
+    Mutation(
+        name="aufseher-verliert-befunde",
+        datei="chinook/overseer.py",
+        alt="    for befund in befunde:",
+        neu="    for befund in bewertungen:",
+        trifft="die Antwort des Modells bestimmt, welche Befunde uebrig bleiben",
+    ),
+    Mutation(
+        name="erfundener-fingerabdruck-akzeptiert",
+        datei="chinook/overseer.py",
+        alt="        if fingerabdruck not in erlaubt or einschaetzung not in EINSCHAETZUNGEN:",
+        neu="        if False:",
+        trifft="das Modell darf Befunde erfinden und Einschaetzungen ausdenken",
+    ),
+    Mutation(
+        name="ablehnung-gilt-als-ergebnis",
+        datei="chinook/overseer.py",
+        alt='    if antwort.get("stop_reason") == "refusal":',
+        neu="    if False:",
+        trifft="eine Ablehnung des Modells sieht aus wie eine Einschaetzung",
+    ),
+    Mutation(
+        name="begruendung-ungefiltert",
+        datei="chinook/overseer.py",
+        alt='    text = _STEUERZEICHEN.sub(" ", text).strip()',
+        neu="    text = text.strip()",
+        trifft="Steuerzeichen aus der Modellantwort landen im Bericht",
+    ),
+    Mutation(
+        name="require-wirkungslos",
+        datei="chinook/cli.py",
+        alt="    if not gelaufen and args.require:",
+        neu="    if False:",
+        trifft="--require verlangt eine Einschaetzung und nimmt keine Antwort hin",
+    ),
 )
 
 
@@ -231,12 +272,38 @@ def pruefe(mutation: Mutation) -> tuple[bool, str]:
         handle.cleanup()
 
 
-def main() -> int:
+def _schreibe(pfad: str, nutzlast: dict) -> None:
+    ziel = Path(pfad)
+    if ziel.parent != Path(""):
+        ziel.parent.mkdir(parents=True, exist_ok=True)
+    ziel.write_text(json.dumps(nutzlast, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def main(argv=None) -> int:
+    zerleger = argparse.ArgumentParser(
+        prog="checks.counterproof",
+        description="Macht die Bots absichtlich kaputt und verlangt rote Pruefungen.",
+    )
+    zerleger.add_argument("--json", dest="json_out", default="", help="Ergebnis als JSON")
+    args = zerleger.parse_args(argv)
+
     print("Gegenprobe: jede Mutation muss die Pruefungen rot machen.\n")
+    ergebnis = {
+        "schema_version": "1",
+        "bot": "counterproof",
+        "grundlauf": "",
+        "gesamt": len(MUTATIONEN),
+        "gefangen": 0,
+        "mutationen": [],
+    }
+
     gruen, meldung = grundlauf()
+    ergebnis["grundlauf"] = "gruen" if gruen else "rot"
     if not gruen:
         print("Grundlauf ist bereits rot -- die Gegenprobe sagt so nichts aus.")
         print(meldung)
+        if args.json_out:
+            _schreibe(args.json_out, ergebnis)
         return 1
     print("Grundlauf gruen.\n")
 
@@ -248,6 +315,18 @@ def main() -> int:
         if not gefangen:
             print(f"              -> {warum}")
             entkommen.append(mutation)
+        ergebnis["mutationen"].append(
+            {
+                "name": mutation.name,
+                "datei": mutation.datei,
+                "trifft": mutation.trifft,
+                "gefangen": gefangen,
+                "grund": "" if gefangen else warum,
+            }
+        )
+    ergebnis["gefangen"] = ergebnis["gesamt"] - len(entkommen)
+    if args.json_out:
+        _schreibe(args.json_out, ergebnis)
 
     print()
     if entkommen:

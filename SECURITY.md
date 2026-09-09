@@ -20,6 +20,9 @@ und ein möglichst kleiner Fall, der es zeigt.
 | Kein Geheimnis im Repo | der Secret-Bot läuft bei jeder Selbstprüfung über sein eigenes Repo, mit History |
 | Ein Lauf, der nichts feststellen konnte, gilt nicht als bestanden | Rückgabewert `2`, gegengeprüft mit `unbewiesen-gilt-als-bestanden` |
 | Der Lizenz-Bot behauptet keine Lizenz | `KeineRechtsaussageTest` in `checks/test_license_bot.py` |
+| **Kein Befund geht verloren** | der Aufseher baut seine Liste aus den Befunden, nie aus der Modellantwort; `KeinBefundGehtVerlorenTest` und fünf Mutationen |
+| Der Aufseher hat keine Werkzeuge und keine Schreibrechte | `test_der_aufseher_bekommt_keine_werkzeuge`; er stellt genau eine Anfrage und liest die Antwort |
+| Chinook hält keinen Modellschlüssel | der Schlüssel kommt aus `CHINOOK_AI_TOKEN` im Repo des Nutzers |
 | Die aufgerufene Fassung ist festgelegt | leeres `job_workflow_sha` bricht den Workflow ab, statt irgendeine Fassung zu holen |
 
 ## Was Chinook **nicht** verspricht
@@ -36,6 +39,9 @@ und ein möglichst kleiner Fall, der es zeigt.
   ist „hoch". Chinook rechnet kein CVSS aus.
 - **Keine Rechtsauskunft.** Der Lizenz-Bot meldet, was fehlt und was
   auseinandergeht. Was daraus folgt, entscheidet ein Mensch.
+- **Der Aufseher irrt.** Eine Einschätzung ist die Meinung eines Modells, kein
+  Befund. Sie steht in einem eigenen Feld und ersetzt nichts. „Vermutlich
+  Rauschen" ist keine Freigabe.
 
 ## Wenn der Secret-Bot etwas findet
 
