@@ -266,3 +266,21 @@ def run(root: str, excludes=()) -> list[Finding]:
             continue
         befunde.extend(scan_text(text, rel))
     return befunde
+
+
+_SPRACHE = {PYTHON: "Python", JAVASCRIPT: "JavaScript / TypeScript", SHELL: "Shell"}
+
+
+def regeln() -> list[dict]:
+    """Die Regeln dieses Bots, abgeleitet aus `RULES`."""
+    return [
+        {
+            "name": rule.name,
+            "titel": rule.title,
+            "schwere": rule.severity,
+            "zuversicht": rule.confidence,
+            "sprache": _SPRACHE.get(rule.suffixes, ", ".join(rule.suffixes)),
+            "was": rule.explanation,
+        }
+        for rule in RULES
+    ]

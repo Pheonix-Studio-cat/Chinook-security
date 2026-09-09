@@ -23,6 +23,8 @@ und ein möglichst kleiner Fall, der es zeigt.
 | **Kein Befund geht verloren** | der Aufseher baut seine Liste aus den Befunden, nie aus der Modellantwort; `KeinBefundGehtVerlorenTest` und fünf Mutationen |
 | Der Aufseher hat keine Werkzeuge und keine Schreibrechte | `test_der_aufseher_bekommt_keine_werkzeuge`; er stellt genau eine Anfrage und liest die Antwort |
 | Chinook hält keinen Modellschlüssel | der Schlüssel kommt aus `CHINOOK_AI_TOKEN` im Repo des Nutzers |
+| Die Website lädt nichts nach | kein Stylesheet, keine Schrift, kein Skript von fremden Adressen; `KeineFremdenRessourcenTest` |
+| Die Website beschreibt, was die Bots wirklich tun | die Tabellen werden aus `regeln()` erzeugt; `KeineDriftTest` hält sie gegen die Regeln, die die Bots melden |
 | Die aufgerufene Fassung ist festgelegt | leeres `job_workflow_sha` bricht den Workflow ab, statt irgendeine Fassung zu holen |
 
 ## Was Chinook **nicht** verspricht

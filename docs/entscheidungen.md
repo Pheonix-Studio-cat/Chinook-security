@@ -118,6 +118,29 @@ Bot meldete sich prompt selbst — sieben Treffer in der eigenen Regeltabelle.
 
 ---
 
+## Die Website wird erzeugt, nicht gepflegt
+
+Jede Regel auf der Seite kommt aus `regeln()` des Bots, der sie anwendet. Es
+gibt keine zweite, handgepflegte Liste — sie würde driften, und die Seite
+behauptete dann etwas, das kein Bot tut.
+
+Wo die Schwere vom Zusammenhang abhängt und deshalb keine Tabelle im Code
+existiert (Workflow-Bot), gibt es eine `REGELN`-Beschreibung — **und eine
+Prüfung, die sie gegen die Regeln hält, die der Bot gegen seine Fixtures
+tatsächlich meldet.** Eine Beschreibung, die driften darf, driftet.
+
+Die Seite lädt nichts nach: kein Stylesheet, keine Schrift, kein Skript von
+woanders. Eine Seite, die ein Sicherheitswerkzeug beschreibt, holt keinen Code
+von fremden Adressen — und die eigene Regel „Fremd-Actions festlegen" gälte
+sonst überall außer auf der eigenen Seite.
+
+Und sie zeigt, was sie weiß: liegt kein Ergebnis der Gegenprobe vor, sagt sie
+das. Eine entkommene Mutation wird angezeigt, nicht weggelassen. Der
+Veröffentlichungs-Workflow fährt die Gegenprobe **vor** dem Bauen; ist sie rot,
+wird nichts veröffentlicht.
+
+---
+
 ## Der Aufseher darf einordnen, nie entfernen — und das steht im Code, nicht im Prompt
 
 Die Zusicherung „kein Befund geht verloren" hängt **nicht** daran, dass das

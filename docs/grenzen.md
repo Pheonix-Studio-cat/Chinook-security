@@ -118,6 +118,16 @@ gefunden. Die Regeln stehen vollständig in `chinook/secret_bot.py` und
   befreit und auf 400 Zeichen gekuerzt, sonst nicht geprueft. Wer sie anzeigt,
   behandelt sie als Text, nicht als Markup.
 
+## Website
+
+- **Sie zeigt den Stand einer Fassung, nicht den eines fremden Repos.** Die
+  Zahlen darauf gelten fuer Chinook selbst.
+- **Der Stand der Gegenprobe stammt vom letzten Bau** -- bei jedem Merge auf
+  `main` und einmal woechentlich. Was dazwischen passiert, steht nicht darauf.
+- **Kein Suchfeld, keine Navigation, kein Skript.** Eine Seite, eine Datei.
+- **GitHub Pages muss im Repo eingeschaltet sein** (Settings -> Pages -> Source:
+  GitHub Actions). Ohne das laeuft der Bau, aber die Veroeffentlichung scheitert.
+
 ## Die Gegenprobe dauert
 
 25 Mutationen, jede mit einem vollstaendigen Lauf der Pruefungen in einer Kopie

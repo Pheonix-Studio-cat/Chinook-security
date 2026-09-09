@@ -329,3 +329,21 @@ def run(root: str, excludes=(), history: bool = False) -> list[Finding]:
     if history:
         findings.extend(scan_history(root))
     return findings
+
+
+def regeln() -> list[dict]:
+    """Die Regeln dieses Bots, fuer die Website.
+
+    Abgeleitet aus `RULES` -- nicht danebengeschrieben. Eine zweite Liste
+    wuerde driften, und die Seite behauptete dann etwas, das der Bot nicht tut.
+    """
+    return [
+        {
+            "name": rule.name,
+            "titel": rule.title,
+            "schwere": rule.severity,
+            "zuversicht": rule.confidence,
+            "was": rule.remediation,
+        }
+        for rule in RULES
+    ]

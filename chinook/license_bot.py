@@ -271,3 +271,47 @@ def run(root: str, excludes=()) -> list[Finding]:
                 )
             )
     return befunde
+
+
+REGELN = (
+    {
+        "name": "license-file-missing",
+        "titel": "Keine Lizenzdatei im Wurzelverzeichnis",
+        "schwere": "medium",
+        "was": "Ohne Erlaubnis gilt im Zweifel: nichts.",
+    },
+    {
+        "name": "license-undeclared",
+        "titel": "Das Paket erklaert keine Lizenz",
+        "schwere": "medium",
+        "was": "Wer es einbindet, kann nicht pruefen, ob er darf.",
+    },
+    {
+        "name": "license-link-broken",
+        "titel": "Die erklaerte Lizenz verweist ins Leere",
+        "schwere": "medium",
+        "was": "Die angegebene Datei existiert nicht -- es gibt keine nachlesbaren Bedingungen.",
+    },
+    {
+        "name": "license-mismatch",
+        "titel": "Erklaerung und beiliegender Text gehen auseinander",
+        "schwere": "medium",
+        "was": (
+            "Welche gilt, entscheidet dieser Bot nicht. "
+            "License status requires verification."
+        ),
+    },
+    {
+        "name": "license-unrecognised",
+        "titel": "Keine bekannte SPDX-Kennung",
+        "schwere": "info",
+        "was": (
+            "Das heisst nicht, dass sie falsch ist -- es heisst, dass der Bot "
+            "sie nicht bestaetigen kann."
+        ),
+    },
+)
+
+
+def regeln() -> list[dict]:
+    return [dict(regel) for regel in REGELN]

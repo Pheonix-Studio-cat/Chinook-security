@@ -215,6 +215,27 @@ MUTATIONEN: tuple[Mutation, ...] = (
         neu="    if False:",
         trifft="--require verlangt eine Einschaetzung und nimmt keine Antwort hin",
     ),
+    Mutation(
+        name="regel-fehlt-auf-der-seite",
+        datei="webseite/build.py",
+        alt="    for regel in regeln:",
+        neu="    for regel in regeln[1:]:",
+        trifft="die Website beschreibt eine Regel nicht, die der Bot anwendet",
+    ),
+    Mutation(
+        name="seite-ohne-maskierung",
+        datei="webseite/build.py",
+        alt="    return html.escape(str(text), quote=False)",
+        neu="    return str(text)",
+        trifft="fremder Text landet ungefiltert im HTML",
+    ),
+    Mutation(
+        name="gegenprobe-schoengerechnet",
+        datei="webseite/build.py",
+        alt='    gefangen = daten.get("gefangen", 0)',
+        neu='    gefangen = daten.get("gesamt", 0)',
+        trifft="die Seite meldet alle Mutationen als gefangen, auch die entkommenen",
+    ),
 )
 
 

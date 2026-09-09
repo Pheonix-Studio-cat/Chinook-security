@@ -14,9 +14,9 @@ wird gemeldet.
 
 ## Stand
 
-Gebaut sind Etappe 1 bis 3: das gemeinsame Befund-Format, **fünf Bots**, die
-Gegenprobe, je eine composite action pro Bot — und der **Aufseher**, der die
-Befunde einordnet und die Bots kontrolliert.
+**Alle fünf Etappen sind gebaut:** das gemeinsame Befund-Format, fünf Bots, die
+Gegenprobe, je eine composite action pro Bot, der **Aufseher**, der die Befunde
+einordnet und die Bots kontrolliert, die **Website** und der **Wochenlauf**.
 
 | Teil | Zustand |
 | --- | --- |
@@ -29,9 +29,10 @@ Befunde einordnet und die Bots kontrolliert.
 | Composite Action je Bot | ✅ auch aus fremden Repos nachgewiesen |
 | **Aufseher** (KI-Schicht) | ✅ ordnet ein, entfernt nie |
 | Gegenprobe | ✅ 25 Mutationen, alle gefangen |
-| Website | ⏳ Etappe 4 |
+| **Website** | ✅ aus dem Quelltext erzeugt, GitHub Pages |
+| **Wochenlauf** | ✅ montags, auch ohne Commit |
 
-**128 Prüfungen, alle grün. 25 Mutationen, alle gefangen.**
+**146 Prüfungen, alle grün. 25 Mutationen, alle gefangen.**
 
 **Keine Abhängigkeiten.** Nur die Python-Standardbibliothek. Ein
 Sicherheitswerkzeug mit dreihundert transitiven Paketen ist selbst eine
@@ -269,6 +270,35 @@ sprechen eine andere Request-Form — das steht in `docs/grenzen.md`.
 
 ---
 
+## Die Website
+
+Statisch, eine einzige HTML-Datei, **aus dem Quelltext erzeugt**:
+
+```
+python3 -m webseite.build --gegenprobe chinook-gegenprobe.json
+```
+
+Jede Regel, die auf der Seite steht, kommt aus dem Bot, der sie anwendet
+(`regeln()`). Eine von Hand gepflegte Liste würde driften, und die Seite
+behauptete dann etwas, das kein Bot tut. Eine Prüfung hält fest, dass jede
+Regel auf der Seite steht — und eine zweite, dass die Regeltabellen **genau**
+den Regeln entsprechen, die die Bots gegen ihre Fixtures melden.
+
+Die Seite lädt **nichts nach**: kein Stylesheet, keine Schrift, kein Skript von
+woanders. Eine Seite, die ein Sicherheitswerkzeug beschreibt, holt keinen Code
+von fremden Adressen. Auch das ist geprüft.
+
+Und sie zeigt den **Stand der Gegenprobe** — welche Mutation gefangen wurde und
+welche nicht. Liegt kein Ergebnis vor, sagt sie das, statt etwas zu behaupten.
+Der Bau läuft bei jedem Merge auf `main` und einmal wöchentlich.
+
+## Der Wochenlauf
+
+Montags: Prüfungen, Gegenprobe und alle fünf Bots über das eigene Repo, ohne
+dass jemand etwas committen muss. Er fängt, was sich **ohne Commit** ändert —
+ein neues Advisory bei OSV, eine geänderte Voreinstellung bei GitHub Actions,
+ein Werkzeug, das anders antwortet als letzte Woche.
+
 ## Die Gegenprobe
 
 ```
@@ -298,6 +328,7 @@ chinook/            die Bots, nur Standardbibliothek
   cli.py            python3 -m chinook.cli <bot> …
 actions/            je ein composite action pro Bot
 .github/workflows/  die Selbstprüfung
+webseite/build.py   erzeugt die Seite aus den Regeln der Bots
 checks/             Prüfungen und die Gegenprobe
 fixtures/workflows/ absichtlich kaputte Workflows — außerhalb von
                     .github/workflows, damit GitHub sie nicht ausführt
@@ -313,12 +344,20 @@ Repo wird von GitHubs Push-Protection blockiert und von Scannern gemeldet.
 
 ---
 
-## Was noch nicht da ist
+## Was offen ist
 
-Die Website (Etappe 4) und der wöchentliche Aufseher-Lauf (Etappe 5). Die
-Website wird statisch aus diesem Repo gebaut und zeigt neben den Bots auch den
-Stand der Gegenprobe — die Seite sagt dann nicht nur, dass geprüft wird,
-sondern ob die Prüfungen selbst bewiesen sind.
+- **`v1` taggen**, damit Nutzer `@v1` schreiben können statt `@main` oder eines
+  Commit-SHA.
+- **`actions/checkout` auf einen SHA festlegen.** Der Workflow-Bot meldet es an
+  den eigenen Workflows als Hinweis — der SHA fehlt, weil kein verifizierter
+  vorlag, und einen zu erfinden wäre eine erfundene Angabe in einem
+  Sicherheitswerkzeug.
+- **Der Aufseher ist nie gegen ein echtes Modell gelaufen.** Die Prüfungen
+  fahren gegen einen Stub — richtig so, geprüft wird, was Chinook mit der
+  Antwort macht. Ob ein echtes Modell brauchbare Einschätzungen liefert, ist
+  offen.
+- **Mehr Ökosysteme** für den Dependency-Bot, **Lizenzen der Abhängigkeiten**
+  für den Lizenz-Bot.
 
 ---
 

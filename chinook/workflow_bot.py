@@ -259,3 +259,59 @@ def run(root: str, excludes=()) -> list[Finding]:
             continue
         findings.extend(scan_workflow(text, rel))
     return findings
+
+
+# Die Regeln dieses Bots stehen in `scan_workflow` verstreut, weil ihre Schwere
+# vom Zusammenhang abhaengt. Diese Tabelle beschreibt sie fuer die Website --
+# und `checks/test_webseite.py` prueft, dass sie **genau** den Regeln entspricht,
+# die der Bot gegen seine Fixtures tatsaechlich meldet. Eine Beschreibung, die
+# driften darf, ist eine Beschreibung, die driftet.
+REGELN = (
+    {
+        "name": "pull-request-target-checkout",
+        "titel": "pull_request_target checkt fremden Code aus",
+        "schwere": "critical",
+        "was": (
+            "Der Workflow laeuft mit den Secrets des Ziel-Repos und fuehrt darin "
+            "fremden Code aus. Wer einen PR oeffnen kann, uebernimmt den Lauf."
+        ),
+    },
+    {
+        "name": "script-injection",
+        "titel": "Fremder Text wird in ein Skript eingesetzt",
+        "schwere": "high",
+        "was": (
+            "Ein Titel oder Kommentar wird vor der Ausfuehrung in einen "
+            "`run:`-Block eingesetzt. Ein Backtick darin ist dann ein Befehl."
+        ),
+    },
+    {
+        "name": "permissions-write-all",
+        "titel": "Workflow laeuft mit allen Schreibrechten",
+        "schwere": "high",
+        "was": "Jeder Schritt erbt sie, auch eine Fremd-Action.",
+    },
+    {
+        "name": "unpinned-action",
+        "titel": "Action nicht auf einen Commit festgelegt",
+        "schwere": "medium",
+        "was": (
+            "Ein Tag laesst sich verschieben. Dann aendert sich, was mit den "
+            "Rechten dieses Repos laeuft. Bei `actions/*` nur ein Hinweis."
+        ),
+    },
+    {
+        "name": "permissions-missing",
+        "titel": "Workflow legt seine Rechte nicht fest",
+        "schwere": "medium",
+        "was": (
+            "Ohne `permissions:` gelten die Standardrechte des Repos -- an "
+            "anderer Stelle eingestellt und aenderbar, ohne dass die Datei sich "
+            "aendert."
+        ),
+    },
+)
+
+
+def regeln() -> list[dict]:
+    return [dict(regel) for regel in REGELN]
