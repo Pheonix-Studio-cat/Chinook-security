@@ -1,0 +1,73 @@
+# Aufrufbarer Workflow -- so binden fremde Repos den Bot mit einer Zeile ein:
+#
+#   jobs:
+#     dependency_bot:
+#       uses: Pheonix-Studio-cat/Chinook-security/.github/workflows/dependency-bot.yml@v1
+#
+# Er laeuft nicht von selbst; `workflow_call` ist der einzige Ausloeser.
+name: Chinook Dependency-Bot
+
+on:
+  workflow_call:
+    inputs:
+      path:
+        description: "Wurzel des zu pruefenden Verzeichnisses."
+        type: string
+        required: false
+        default: "."
+      exclude:
+        description: "Pfade, die uebersprungen werden, kommagetrennt."
+        type: string
+        required: false
+        default: ""
+      fail-on:
+        description: "Ab welchem Schweregrad der Lauf fehlschlaegt."
+        type: string
+        required: false
+        default: "high"
+
+permissions:
+  contents: read
+
+jobs:
+  dependency_bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Das aufrufende Repo auschecken
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Chinook wird in **genau der Fassung** geholt, die der Aufrufer mit @… gewaehlt
+      # hat. `job_workflow_sha` ist der Commit dieser Workflow-Datei; ohne ihn waere
+      # die Fassung nicht festgelegt, und der Schritt bricht lieber ab, als
+      # stillschweigend irgendetwas zu holen.
+      - name: Fassung feststellen
+        id: fassung
+        env:
+          SHA: ${{ github.job_workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SHA" ]; then
+            echo "job_workflow_sha ist leer -- die Fassung von Chinook waere nicht" >&2
+            echo "festgelegt. Der Lauf bricht ab, statt eine beliebige zu holen." >&2
+            exit 1
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Chinook auschecken
+        uses: actions/checkout@v4
+        with:
+          repository: Pheonix-Studio-cat/Chinook-security
+          ref: ${{ steps.fassung.outputs.sha }}
+          path: .chinook
+
+      - name: Chinook Dependency-Bot
+        uses: ./.chinook/actions/dependency-bot
+        with:
+          path: ${{ inputs.path }}
+          # `.chinook` ist unser eigener Quelltext im Arbeitsverzeichnis des
+          # Aufrufers -- der Bot soll das Repo pruefen, nicht sich selbst.
+          exclude: ${{ inputs.exclude }},.chinook
+          fail-on: ${{ inputs.fail-on }}
+          sarif: ""

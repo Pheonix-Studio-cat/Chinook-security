@@ -92,3 +92,91 @@ def make_repo_with_deleted_secret(rule: str = "aws-access-key-id") -> tempfile.T
     git(root, "add", "-A")
     git(root, "commit", "--quiet", "-m", "Aufgeraeumt -- aber nur im Arbeitsbaum")
     return handle
+
+
+# --- Code-Bot -------------------------------------------------------------
+
+import json as _json
+import pathlib as _pathlib
+
+WURZEL = _pathlib.Path(__file__).resolve().parent.parent
+
+
+def code_proben() -> dict:
+    """Die Proben aus `fixtures/code/samples.json`.
+
+    Sie liegen als JSON und nicht als `.py`/`.js`/`.sh`, weil der Code-Bot sonst
+    beim Lauf ueber das eigene Repo seine eigenen Fixtures melden wuerde.
+    """
+    with open(WURZEL / "fixtures" / "code" / "samples.json", encoding="utf-8") as handle:
+        return _json.load(handle)["regeln"]
+
+
+def schreibe_code_datei(root: str, name: str, probe: dict, sauber: bool = False) -> str:
+    """Schreibt eine Probe als Datei mit der passenden Endung."""
+    ziel = os.path.join(root, f"{name.replace('/', '_')}{probe['suffix']}")
+    with open(ziel, "w", encoding="utf-8") as handle:
+        handle.write(probe["sauber" if sauber else "kaputt"] + "\n")
+    return ziel
+
+
+# --- Dependency-Bot -------------------------------------------------------
+
+
+class OsvStub:
+    """Ein OSV-Ersatz auf dem eigenen Rechner.
+
+    Die echte Adresse ist aus dieser Umgebung nicht erreichbar, und eine
+    Pruefung, die vom Netz abhaengt, ist keine Pruefung. Also wird gegen einen
+    Stub gefahren -- und der Stub raeumt sich selbst ab.
+    """
+
+    def __init__(self, antwort=None, status: int = 200, koerper: bytes | None = None):
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        import threading
+
+        self.anfragen = []
+        stub = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):  # noqa: N802 -- von BaseHTTPRequestHandler vorgegeben
+                laenge = int(self.headers.get("Content-Length", "0"))
+                stub.anfragen.append(_json.loads(self.rfile.read(laenge) or b"{}"))
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                if koerper is not None:
+                    nutzlast = koerper
+                else:
+                    anzahl = len(stub.anfragen[-1].get("queries", []))
+                    vorgabe = {"results": [{} for _ in range(anzahl)]}
+                    nutzlast = _json.dumps(antwort if antwort is not None else vorgabe).encode()
+                self.send_header("Content-Length", str(len(nutzlast)))
+                self.end_headers()
+                self.wfile.write(nutzlast)
+
+            def log_message(self, *_args):
+                pass
+
+        self.server = HTTPServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+
+    @property
+    def url(self) -> str:
+        host, port = self.server.server_address[:2]
+        return f"http://{host}:{port}/v1/querybatch"
+
+    def __enter__(self) -> "OsvStub":
+        self.thread.start()
+        return self
+
+    def __exit__(self, *_ausnahme) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=5)
+
+
+def schreibe_requirements(root: str, zeilen) -> str:
+    ziel = os.path.join(root, "requirements.txt")
+    with open(ziel, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(zeilen) + "\n")
+    return ziel

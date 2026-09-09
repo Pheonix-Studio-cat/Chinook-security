@@ -44,9 +44,67 @@ gefunden. Die Regeln stehen vollständig in `chinook/secret_bot.py` und
   sind, steht nicht in der Datei; deshalb ist `permissions-missing` „mittel"
   und nicht „hoch".
 
+## Dependency-Bot
+
+- **Nur Sperrdateien**, und nur die drei Formate `requirements.txt`,
+  `package-lock.json`, `go.mod`. Kein `poetry.lock`, kein `yarn.lock`, kein
+  `Cargo.lock`, kein `pom.xml`. Wo nichts gelesen wird, wird auch nichts
+  gefragt — und dann ist ein leeres Ergebnis wirklich leer.
+- **`requirements.txt` nur mit `==`.** Eine Spanne beschreibt nicht, was
+  installiert wird; sie wird als `dependency-unpinned` gemeldet statt geraten.
+- **Er haengt an einem fremden Dienst.** OSV.dev muss erreichbar sein. Ist es
+  das nicht, endet der Lauf mit **2** und gilt nicht als bestanden.
+- **Er holt keine Einzelheiten zu den Advisories.** Die Sammelabfrage gibt nur
+  Kennungen zurueck; eine behobene Version steht deshalb **nicht** im Befund.
+  Sie zu nennen, ohne sie geholt zu haben, waere eine erfundene Angabe.
+- **Keine Einstufung nach Schwere.** Jede bekannte Schwachstelle ist "hoch".
+  Das Einordnen ist Aufgabe des Aufsehers (Etappe 3).
+- **Die echte Adresse wird von den Pruefungen nicht angesprochen.** Sie fahren
+  gegen einen Stub auf dem eigenen Rechner. In der Selbstpruefung gibt es dafuer
+  den Job `netzprobe` — der **darf fehlschlagen**, weil er ueber einen fremden
+  Dienst Auskunft gibt und nicht ueber Chinook.
+
+## Code-Bot
+
+- **Musterbasiert, ohne Datenflussanalyse.** Er sieht, *dass* eine gefaehrliche
+  Stelle da ist, nicht *ob* an ihr etwas Fremdes ankommt. `eval` auf einer
+  Konstanten ist harmlos und wird trotzdem gemeldet -- deshalb tragen diese
+  Regeln mittlere Zuversicht.
+- **Zeilenweise.** Ein Aufruf, der ueber zwei Zeilen geht, wird nicht erkannt.
+- **Kommentarzeilen werden uebersprungen**, erkannt an `#`, `//`, `*`, `/*`.
+  Ein auskommentierter Block in der Mitte einer Zeile zaehlt weiter.
+- **Nur `.py`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.sh`, `.bash`.**
+  Kein Go, kein Rust, kein Java, kein PHP.
+
+## Lizenz-Bot
+
+- **Er stellt keine Rechtstatsache fest.** Er sagt nie, unter welcher Lizenz
+  etwas steht -- nur was erklaert ist, was fehlt und was auseinandergeht.
+- **Die Texterkennung ist eine Heuristik** an wenigen Merkmalsaetzen. Sie dient
+  ausschliesslich dazu, einen **Widerspruch** zur Erklaerung zu melden.
+- **Nur das Wurzelverzeichnis**, nur `package.json` und `pyproject.toml`. Keine
+  Unterprojekte, kein `setup.cfg`, keine Klassifizierer.
+- **`pyproject.toml` wird zeilenweise gelesen**, nicht als TOML. Erkannt werden
+  `license = "…"`, `license = {text = "…"}` und `license = {file = "…"}` --
+  jeweils am Zeilenanfang.
+- **Die Kennungsliste ist kurz.** Was fehlt, wird als *License status requires
+  verification* gemeldet, nicht als falsch.
+- **Die Lizenzen der Abhaengigkeiten** sind nicht erfasst. Das ist eine eigene
+  Aufgabe und braucht die Metadaten der Pakete, nicht nur ihre Namen.
+
 ## Composite Actions
 
 - Der aufrufende Workflow muss **selbst auschecken**. Eine composite action
   bringt keinen Checkout mit.
 - Für die History-Prüfung muss der Checkout `fetch-depth: 0` setzen.
 - `python3` wird als vorhanden vorausgesetzt (auf `ubuntu-latest` ist es das).
+
+## Aufrufbare Workflows
+
+- Sie holen Chinook ueber `github.job_workflow_sha` -- den Commit der
+  Workflow-Datei, die aufgerufen wurde. Ist der leer, **bricht der Lauf ab**,
+  statt eine beliebige Fassung zu holen.
+- Sie checken das aufrufende Repo mit `fetch-depth: 0` aus, wenn der Bot die
+  History braucht (Secret-Bot), sonst flach.
+- Sie schliessen `.chinook` aus der Pruefung aus -- das ist unser eigener
+  Quelltext im Arbeitsverzeichnis des Aufrufers, nicht seiner.

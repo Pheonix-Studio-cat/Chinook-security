@@ -31,14 +31,77 @@ gegengeprüft.
 
 ---
 
-## Composite Actions statt reusable workflows — vorerst
+## Aufrufbare Workflows: `job_workflow_sha` statt eines verdrahteten Refs
 
 Eine composite action findet ihren eigenen Quelltext über
-`${{ github.action_path }}`. Ein reusable workflow müsste sein eigenes Repo ein
-zweites Mal auschecken, und zwar auf einem **fest verdrahteten Ref** — der dann
-nicht mehr dem entspricht, was der Aufrufer mit `@v1` gewählt hat.
+`${{ github.action_path }}`. Ein aufrufbarer Workflow nicht: `actions/checkout`
+holt dort das Repo des **Aufrufers**. Der erste Entwurf hätte Chinook auf einem
+**fest verdrahteten Ref** ein zweites Mal ausgecheckt — der dann nicht mehr dem
+entspräche, was der Aufrufer mit `@v1` gewählt hat.
 
-Reusable workflows kommen in Etappe 2, mit einer Antwort auf dieses Problem.
+Die Antwort ist `github.job_workflow_sha`: der Commit **genau der
+Workflow-Datei, die aufgerufen wurde**. Damit stimmt die geholte Fassung mit
+dem `@…` des Aufrufers überein.
+
+**Und wenn der Wert leer ist, bricht der Lauf ab.** Ein leerer `ref` würde
+sonst stillschweigend den Standard-Branch holen — grün, aber nicht die Fassung,
+die jemand gewählt hat. Genau die Sorte stiller Fehler, gegen die dieses
+Projekt gebaut ist. Ein Job der Selbstprüfung ruft einen dieser Workflows auf;
+damit ist es gefahren, nicht behauptet.
+
+Beide Wege bleiben: der Workflow für den Einbau mit einer Zeile, die composite
+action für den, der die Bots als Schritte in seinen eigenen Job stellen will.
+
+---
+
+## Rückgabewert 2: „der Lauf beweist nichts"
+
+`0` sauber, `1` Befunde — und `2`, wenn der Lauf nichts feststellen konnte.
+
+Der Fall, für den es die `2` gibt: der Dependency-Bot fragt OSV.dev. Kommt die
+Abfrage nicht durch, oder passt die Antwort nicht zur Anfrage, dann **weiß**
+der Bot nichts. Ein leeres Ergebnis daraus zu machen, wäre genau die Prüfung,
+die grün ist und nichts beweist.
+
+Zwei Mutationen halten das fest: eine verschluckt den Netzfehler, eine gibt
+statt der `2` eine `0` zurück. Beide werden gefangen.
+
+---
+
+## Chinook stuft Schwachstellen nicht selbst ein
+
+Jede bekannte Schwachstelle ist `high`. Kein CVSS, keine eigene Zahl.
+
+Die Sammelabfrage bei OSV gibt nur Kennungen zurück, keine Vektoren. Aus dem,
+was wir nicht geholt haben, eine Schwere abzuleiten, wäre eine erfundene
+Angabe. Das Einordnen — was in **diesem** Repo tatsächlich erreichbar ist —
+ist die Aufgabe des Aufsehers in Etappe 3, und dort mit einem Menschen
+dahinter.
+
+---
+
+## Der Lizenz-Bot stellt keine Rechtstatsache fest
+
+Er sagt nie, unter welcher Lizenz etwas steht. Er sagt, was **erklärt** ist, wo
+**nichts** erklärt ist, und wo Erklärung und beiliegende Datei
+**auseinandergehen**. Unklares heißt *License status requires verification*.
+
+Die Texterkennung ist ausdrücklich eine Heuristik und dient **nur** dazu, einen
+Widerspruch zu melden — nie dazu, eine Lizenz zu behaupten. Eine Prüfung geht
+die Befunde durch und stellt sicher, dass keiner eine Lizenz behauptet.
+
+---
+
+## Die Code-Proben liegen als JSON
+
+Aus demselben Grund, aus dem die Secret-Fixtures zur Laufzeit entstehen: eine
+`.py`-Datei mit `eval(eingabe)` würde der Code-Bot beim Lauf über sein eigenes
+Repo melden. Als JSON wird sie nicht gescannt, ist aber trotzdem im Repo
+lesbar und im Diff nachvollziehbar.
+
+Dasselbe gilt für die Regeltexte selbst: kein Titel und keine Erklärung
+schreibt ein Muster aus, das die Regel sucht. Der erste Entwurf tat es, und der
+Bot meldete sich prompt selbst — sieben Treffer in der eigenen Regeltabelle.
 
 ---
 
@@ -87,7 +150,7 @@ Sonst führt GitHub sie aus. Eine Prüfung hält das fest.
 
 ## Der eigene `actions/checkout` ist noch nicht auf einen SHA festgelegt
 
-Der Workflow-Bot meldet das an der eigenen `selfcheck.yml` — als Hinweis, weil
-`actions/*` GitHub selbst gehört. Es bleibt trotzdem offen: der SHA wird
+Der Workflow-Bot meldet das an den eigenen Workflows — inzwischen elfmal, als
+Hinweis, weil `actions/*` GitHub selbst gehört. Es bleibt trotzdem offen: der SHA wird
 eingetragen, sobald er verifiziert vorliegt. Einen SHA zu erfinden, damit die
 eigene Prüfung schöner aussieht, ist keine Option.

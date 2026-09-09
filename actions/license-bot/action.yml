@@ -1,0 +1,74 @@
+name: "Chinook Lizenz-Bot"
+description: >-
+  Meldet, was an Lizenzangaben fehlt oder auseinandergeht. Er stellt nie fest, unter
+  welcher Lizenz etwas steht -- das ist eine Frage an einen Menschen.
+author: "PHÖNIX STUDIO"
+
+inputs:
+  path:
+    description: "Wurzel des zu pruefenden Verzeichnisses."
+    required: false
+    default: "."
+  exclude:
+    description: "Pfade, die uebersprungen werden, kommagetrennt."
+    required: false
+    default: ""
+  fail-on:
+    description: "Ab welchem Schweregrad der Schritt fehlschlaegt: critical, high, medium, low, info oder never."
+    required: false
+    default: "medium"
+  report:
+    description: "Wohin der JSON-Bericht geschrieben wird."
+    required: false
+    default: "chinook-license-bot.json"
+  sarif:
+    description: "Wohin der SARIF-Bericht geschrieben wird. Leer lassen, um keinen zu schreiben."
+    required: false
+    default: "chinook-license-bot.sarif"
+
+outputs:
+  report:
+    description: "Pfad des JSON-Berichts."
+    value: ${{ steps.lauf.outputs.report }}
+  total:
+    description: "Anzahl der Befunde."
+    value: ${{ steps.lauf.outputs.total }}
+
+runs:
+  using: composite
+  steps:
+    - id: lauf
+      shell: bash
+      # Die Eingaben gehen ueber `env` in das Skript, nicht ueber ${{ }} im
+      # Skripttext -- genau das, was der Workflow-Bot bei anderen anmahnt.
+      env:
+        CHINOOK_PATH: ${{ inputs.path }}
+        CHINOOK_EXCLUDE: ${{ inputs.exclude }}
+        CHINOOK_FAIL_ON: ${{ inputs.fail-on }}
+        CHINOOK_REPORT: ${{ inputs.report }}
+        CHINOOK_SARIF: ${{ inputs.sarif }}
+        PYTHONPATH: ${{ github.action_path }}/../..
+      run: |
+        set -euo pipefail
+        argumente=(license-bot --path "$CHINOOK_PATH" --fail-on "$CHINOOK_FAIL_ON")
+        if [ -n "$CHINOOK_EXCLUDE" ]; then
+          argumente+=(--exclude "$CHINOOK_EXCLUDE")
+        fi
+        if [ -n "$CHINOOK_REPORT" ]; then
+          argumente+=(--json "$CHINOOK_REPORT")
+        fi
+        if [ -n "$CHINOOK_SARIF" ]; then
+          argumente+=(--sarif "$CHINOOK_SARIF")
+        fi
+        echo "report=$CHINOOK_REPORT" >> "$GITHUB_OUTPUT"
+        status=0
+        python3 -m chinook.cli "${argumente[@]}" || status=$?
+        if [ -f "$CHINOOK_REPORT" ]; then
+          gesamt=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["summary"]["total"])' "$CHINOOK_REPORT")
+        else
+          gesamt=0
+        fi
+        echo "total=$gesamt" >> "$GITHUB_OUTPUT"
+        # Rueckgabewert 2 heisst: der Lauf konnte nichts feststellen. Er wird
+        # durchgereicht, damit er nicht als bestanden durchgeht.
+        exit "$status"

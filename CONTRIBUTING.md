@@ -15,9 +15,15 @@ grün, ist sie wertlos — genau das meldet die Gegenprobe dann auch.
 ```
 python3 -m unittest discover -s checks -t . -v   # die Prüfungen
 python3 -m checks.counterproof                   # die Gegenprobe
-python3 -m chinook.cli secret-bot   --path . --history --fail-on critical
-python3 -m chinook.cli workflow-bot --path . --fail-on medium
+python3 -m chinook.cli secret-bot     --path . --history --fail-on critical
+python3 -m chinook.cli workflow-bot   --path . --fail-on medium
+python3 -m chinook.cli code-bot       --path . --fail-on medium
+python3 -m chinook.cli license-bot    --path . --fail-on medium
+python3 -m chinook.cli dependency-bot --path . --fail-on medium
 ```
+
+Alle fünf laufen **ohne Ausnahmeliste** über das eigene Repo. Wer eine
+Ausnahme braucht, hat meistens ein Fixture an der falschen Stelle.
 
 Dasselbe läuft in `.github/workflows/selfcheck.yml` bei jedem Pull Request.
 
@@ -31,6 +37,14 @@ Dasselbe läuft in `.github/workflows/selfcheck.yml` bei jedem Pull Request.
   gemeldet.
 - **Kaputte Workflows liegen unter `fixtures/`**, nie unter `.github/workflows/`
   — sonst führt GitHub sie aus.
+- **Kaputter Beispielcode liegt als JSON** in `fixtures/code/samples.json`, nie
+  als `.py`/`.js`/`.sh` — sonst meldet der Code-Bot seine eigenen Fixtures.
+- **Kein Regeltext schreibt das Muster aus, das die Regel sucht.** Titel und
+  Erklärung umschreiben es (`der Schalter shell auf wahr`), sonst findet der
+  Bot seine eigene Regeltabelle.
+- **Eine Prüfung fährt nie gegen eine echte fremde Adresse.** Der
+  Dependency-Bot wird gegen einen Stub auf dem eigenen Rechner gefahren; die
+  echte Erreichbarkeit ist ein eigener Job, der fehlschlagen darf.
 - **Keine erfundenen Zahlen.** Keine Erkennungsraten, keine Vergleiche, keine
   Benchmarks ohne Messung, die im Repo nachvollziehbar ist.
 
