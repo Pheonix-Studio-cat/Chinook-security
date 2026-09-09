@@ -1,0 +1,14 @@
+# Kaputt mit Absicht: fremder Text direkt im Skript.
+name: injection
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+jobs:
+  begruessen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Titel ausgeben
+        run: |
+          echo "Neues Ticket: ${{ github.event.issue.title }}"

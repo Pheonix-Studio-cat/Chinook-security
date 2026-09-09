@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Pheonix-Studio-cat/Chinook-security/schema/finding.schema.json",
+  "title": "Chinook-Befundbericht",
+  "description": "Das gemeinsame Format aller Chinook-Bots. Ein Befund traegt nie den gefundenen Wert.",
+  "type": "object",
+  "required": ["schema_version", "bot", "generated_at", "summary", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "1" },
+    "bot": { "type": "string", "description": "Name des Bots, z. B. secret-bot" },
+    "generated_at": { "type": "string", "description": "UTC, ISO 8601" },
+    "target": { "type": "object", "description": "Was geprueft wurde" },
+    "summary": {
+      "type": "object",
+      "required": ["total", "by_severity"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "by_severity": {
+          "type": "object",
+          "propertyNames": { "enum": ["critical", "high", "medium", "low", "info"] },
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "bot", "rule", "title", "severity", "confidence",
+          "location", "explanation", "remediation", "fingerprint"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "description": "bot/rule" },
+          "bot": { "type": "string" },
+          "rule": { "type": "string" },
+          "title": { "type": "string" },
+          "severity": { "enum": ["critical", "high", "medium", "low", "info"] },
+          "confidence": { "enum": ["high", "medium", "low"] },
+          "location": {
+            "type": "object",
+            "required": ["path", "line"],
+            "properties": {
+              "path": { "type": "string" },
+              "line": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "explanation": { "type": "string", "description": "Warum das ein Problem ist" },
+          "remediation": { "type": "string", "description": "Was dagegen hilft" },
+          "evidence": {
+            "type": "string",
+            "description": "Beschreibt den Fund, gibt ihn nie wieder. Regelname und Laenge, sonst nichts."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "sha256 ueber bot, rule, path und line -- bewusst ohne den Fund."
+          }
+        }
+      }
+    }
+  }
+}

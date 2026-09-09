@@ -1,0 +1,40 @@
+# Chinook prueft sich selbst. Ein Sicherheitswerkzeug, das die eigenen Regeln
+# nicht einhaelt, ist kein Argument.
+name: Selbstpruefung
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Die History-Pruefung braucht die ganze History, nicht nur den Kopf.
+          fetch-depth: 0
+
+      - name: Pruefungen
+        run: python3 -m unittest discover -s checks -t . -v
+
+      - name: Gegenprobe -- jede Mutation muss die Pruefungen rot machen
+        run: python3 -m checks.counterproof
+
+      - name: Secret-Bot auf das eigene Repo
+        uses: ./actions/secret-bot
+        with:
+          history: "true"
+          fail-on: critical
+          sarif: ""
+
+      - name: Workflow-Bot auf das eigene Repo
+        uses: ./actions/workflow-bot
+        with:
+          fail-on: medium
+          sarif: ""

@@ -1,0 +1,70 @@
+name: "Chinook Workflow-Bot"
+description: >-
+  Prueft die GitHub Actions des Repos selbst: ungepinnte Actions, zu weite
+  Rechte, pull_request_target mit fremdem Checkout, Script Injection in run-Bloecken.
+author: "PHÖNIX STUDIO"
+
+inputs:
+  path:
+    description: "Wurzel des Repos. Geprueft wird darin .github/workflows."
+    required: false
+    default: "."
+  exclude:
+    description: "Workflow-Pfade, die uebersprungen werden, kommagetrennt."
+    required: false
+    default: ""
+  fail-on:
+    description: "Ab welchem Schweregrad der Schritt fehlschlaegt: critical, high, medium, low, info oder never."
+    required: false
+    default: "high"
+  report:
+    description: "Wohin der JSON-Bericht geschrieben wird."
+    required: false
+    default: "chinook-workflow-bot.json"
+  sarif:
+    description: "Wohin der SARIF-Bericht geschrieben wird. Leer lassen, um keinen zu schreiben."
+    required: false
+    default: "chinook-workflow-bot.sarif"
+
+outputs:
+  report:
+    description: "Pfad des JSON-Berichts."
+    value: ${{ steps.lauf.outputs.report }}
+  total:
+    description: "Anzahl der Befunde."
+    value: ${{ steps.lauf.outputs.total }}
+
+runs:
+  using: composite
+  steps:
+    - id: lauf
+      shell: bash
+      env:
+        CHINOOK_PATH: ${{ inputs.path }}
+        CHINOOK_EXCLUDE: ${{ inputs.exclude }}
+        CHINOOK_FAIL_ON: ${{ inputs.fail-on }}
+        CHINOOK_REPORT: ${{ inputs.report }}
+        CHINOOK_SARIF: ${{ inputs.sarif }}
+        PYTHONPATH: ${{ github.action_path }}/../..
+      run: |
+        set -euo pipefail
+        argumente=(workflow-bot --path "$CHINOOK_PATH" --fail-on "$CHINOOK_FAIL_ON")
+        if [ -n "$CHINOOK_EXCLUDE" ]; then
+          argumente+=(--exclude "$CHINOOK_EXCLUDE")
+        fi
+        if [ -n "$CHINOOK_REPORT" ]; then
+          argumente+=(--json "$CHINOOK_REPORT")
+        fi
+        if [ -n "$CHINOOK_SARIF" ]; then
+          argumente+=(--sarif "$CHINOOK_SARIF")
+        fi
+        echo "report=$CHINOOK_REPORT" >> "$GITHUB_OUTPUT"
+        status=0
+        python3 -m chinook.cli "${argumente[@]}" || status=$?
+        if [ -f "$CHINOOK_REPORT" ]; then
+          gesamt=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["summary"]["total"])' "$CHINOOK_REPORT")
+        else
+          gesamt=0
+        fi
+        echo "total=$gesamt" >> "$GITHUB_OUTPUT"
+        exit "$status"

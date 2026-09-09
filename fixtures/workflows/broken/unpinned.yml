@@ -1,0 +1,9 @@
+# Kaputt mit Absicht: Fremd-Action auf beweglichem Tag, keine permissions.
+name: unpinned
+on:
+  push:
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: some-org/some-action@v3

@@ -1,0 +1,10 @@
+# Kaputt mit Absicht: alle Schreibrechte fuer jeden Schritt.
+name: write-all
+on:
+  push:
+permissions: write-all
+jobs:
+  freigeben:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567
