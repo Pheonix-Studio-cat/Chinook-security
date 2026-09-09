@@ -24,7 +24,7 @@ jobs:
         run: python3 -m unittest discover -s checks -t . -v
 
       - name: Gegenprobe -- jede Mutation muss die Pruefungen rot machen
-        run: python3 -m checks.counterproof
+        run: python3 -m checks.counterproof --json chinook-gegenprobe.json
 
       # Alle fuenf Bots auf das eigene Repo, ohne Ausnahmeliste.
       - name: Secret-Bot auf das eigene Repo
@@ -57,6 +57,36 @@ jobs:
         with:
           fail-on: medium
           sarif: ""
+
+      # Der Aufseher laeuft hier **ohne** Schluessel. Das ist kein Mangel, das
+      # ist der Punkt: Chinook haelt keinen, und der freiwillige Pfad muss
+      # gefahren werden, nicht behauptet. Der Schritt muss gruen sein und
+      # "uebersprungen" melden.
+      - name: Einen Bericht fuer den Aufseher erzeugen
+        uses: ./actions/workflow-bot
+        with:
+          fail-on: never
+          report: chinook-workflow-bot.json
+          sarif: ""
+
+      - name: Aufseher ohne Schluessel -- muss uebersprungen werden
+        id: aufseher
+        uses: ./actions/overseer
+        with:
+          reports: chinook-workflow-bot.json
+
+      - name: Der freiwillige Pfad muss uebersprungen heissen
+        env:
+          STAND: ${{ steps.aufseher.outputs.status }}
+        run: |
+          set -euo pipefail
+          if [ "$STAND" != "uebersprungen" ]; then
+            echo "Der Aufseher meldet '$STAND' statt 'uebersprungen'." >&2
+            echo "Ohne Schluessel darf er nichts einordnen -- und trotzdem nicht scheitern." >&2
+            exit 1
+          fi
+          python3 -c 'import json,sys; a=json.load(open("chinook-overseer.json"))["findings"]; b=json.load(open("chinook-workflow-bot.json"))["findings"]; sys.exit(0) if len(a)==len(b) else sys.exit(f"Der Aufseher hat die Zahl der Befunde veraendert: {len(b)} -> {len(a)}")'
+          echo "Befunde unveraendert durchgereicht."
 
   # Der einzige Schritt, der an einem fremden Dienst haengt. Er darf fehlschlagen,
   # ohne den Lauf zu kippen: er ist **Auskunft** darueber, ob OSV gerade

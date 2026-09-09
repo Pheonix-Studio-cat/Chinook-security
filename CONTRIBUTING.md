@@ -20,6 +20,7 @@ python3 -m chinook.cli workflow-bot   --path . --fail-on medium
 python3 -m chinook.cli code-bot       --path . --fail-on medium
 python3 -m chinook.cli license-bot    --path . --fail-on medium
 python3 -m chinook.cli dependency-bot --path . --fail-on medium
+python3 -m chinook.cli overseer --report chinook-secret-bot.json    # braucht CHINOOK_AI_TOKEN
 ```
 
 Alle fünf laufen **ohne Ausnahmeliste** über das eigene Repo. Wer eine
@@ -44,7 +45,12 @@ Dasselbe läuft in `.github/workflows/selfcheck.yml` bei jedem Pull Request.
   Bot seine eigene Regeltabelle.
 - **Eine Prüfung fährt nie gegen eine echte fremde Adresse.** Der
   Dependency-Bot wird gegen einen Stub auf dem eigenen Rechner gefahren; die
-  echte Erreichbarkeit ist ein eigener Job, der fehlschlagen darf.
+  echte Erreichbarkeit ist ein eigener Job, der fehlschlagen darf. Für den
+  Aufseher gilt dasselbe — geprüft wird nicht das Modell, sondern was Chinook
+  mit dessen Antwort macht.
+- **Jede neue Fähigkeit des Aufsehers braucht einen Angriff.** Was passiert,
+  wenn die Antwort leer ist, wenn sie etwas erfindet, wenn sie eine Anweisung
+  enthält? Wenn die Antwort „nichts" ist, gehört sie als Prüfung ins Repo.
 - **Keine erfundenen Zahlen.** Keine Erkennungsraten, keine Vergleiche, keine
   Benchmarks ohne Messung, die im Repo nachvollziehbar ist.
 

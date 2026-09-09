@@ -99,6 +99,32 @@ gefunden. Die Regeln stehen vollständig in `chinook/secret_bot.py` und
 - Für die History-Prüfung muss der Checkout `fetch-depth: 0` setzen.
 - `python3` wird als vorhanden vorausgesetzt (auf `ubuntu-latest` ist es das).
 
+## Aufseher
+
+- **Er ist freiwillig, und das ist kein Nebensatz.** Ohne `CHINOOK_AI_TOKEN`
+  passiert nichts, und der Lauf bleibt gruen. Ein Bericht ohne Einordnung ist
+  ein vollstaendiger Bericht -- nur ohne Sortierhilfe.
+- **Er kann irren.** Eine Einschaetzung ist eine Meinung eines Modells, kein
+  Befund. Sie steht deshalb in einem eigenen Feld `triage` neben dem Befund und
+  ersetzt ihn nie.
+- **Ein Aufruf, keine Schleife.** Er sieht die Befunde, nicht das Repo -- kein
+  Quelltext, kein Diff, keine Nachfrage. Was nicht im Befund steht, weiss er
+  nicht, und was er dazu erfindet, faellt bei der Pruefung der Antwort weg.
+- **Nur die Anthropic-Messages-API.** Andere Anbieter sprechen eine andere
+  Request-Form. `--api-url` aendert die Adresse, nicht das Format.
+- **Er sieht kein `evidence`.** Das enthaelt zwar keinen Fund, gehoert aber
+  nicht zur Einordnung -- und was nicht hinausgeht, kann auch nicht lecken.
+- **Die Begruendung ist Text aus einem Modell.** Sie wird von Steuerzeichen
+  befreit und auf 400 Zeichen gekuerzt, sonst nicht geprueft. Wer sie anzeigt,
+  behandelt sie als Text, nicht als Markup.
+
+## Die Gegenprobe dauert
+
+25 Mutationen, jede mit einem vollstaendigen Lauf der Pruefungen in einer Kopie
+des Repos. Das sind auf einem CI-Laeufer einige Minuten. Der Preis ist bekannt
+und wird bezahlt: eine Pruefung, die nie gegen einen kaputten Zustand gelaufen
+ist, ist keine Pruefung.
+
 ## Es gibt keine aufrufbaren Workflows
 
 Nur composite actions. Der aufrufende Workflow muss also **selbst auschecken**

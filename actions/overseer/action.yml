@@ -1,0 +1,77 @@
+name: "Chinook Aufseher"
+description: >-
+  Ordnet die Befunde der Bots ein: was ist echt, was ist Rauschen, was ist
+  unklar. Er entfernt nichts und aendert keinen Schweregrad -- er haengt eine
+  Einschaetzung an. Ohne Schluessel wird er uebersprungen, und der Lauf bleibt
+  gruen: die Befunde der Bots stehen unveraendert.
+author: "PHÖNIX STUDIO"
+
+inputs:
+  reports:
+    description: "Befundberichte der Bots, kommagetrennt."
+    required: true
+  report:
+    description: "Wohin der eingeordnete Bericht geschrieben wird."
+    required: false
+    default: "chinook-overseer.json"
+  model:
+    description: "Modell fuer die Einordnung."
+    required: false
+    default: "claude-opus-5"
+  require:
+    description: >-
+      Den Schritt fehlschlagen lassen, wenn der Aufseher nicht laufen konnte.
+      Standard: nein -- er ist freiwillig.
+    required: false
+    default: "false"
+
+outputs:
+  report:
+    description: "Pfad des eingeordneten Berichts."
+    value: ${{ steps.lauf.outputs.report }}
+  status:
+    description: "bewertet, uebersprungen oder fehlgeschlagen."
+    value: ${{ steps.lauf.outputs.status }}
+
+runs:
+  using: composite
+  steps:
+    - id: lauf
+      shell: bash
+      # Der Schluessel kommt **nicht** ueber eine Eingabe, sondern aus der
+      # Umgebung des Aufrufers:
+      #
+      #   env:
+      #     CHINOOK_AI_TOKEN: ${{ secrets.CHINOOK_AI_TOKEN }}
+      #
+      # Chinook haelt keinen Schluessel. Jeder Aufruf rechnet auf das Konto
+      # dessen ab, der ihn einsetzt.
+      env:
+        CHINOOK_REPORTS: ${{ inputs.reports }}
+        CHINOOK_REPORT: ${{ inputs.report }}
+        CHINOOK_MODEL: ${{ inputs.model }}
+        CHINOOK_REQUIRE: ${{ inputs.require }}
+        PYTHONPATH: ${{ github.action_path }}/../..
+      run: |
+        set -euo pipefail
+        argumente=(overseer --model "$CHINOOK_MODEL" --json "$CHINOOK_REPORT")
+        IFS=',' read -ra berichte <<< "$CHINOOK_REPORTS"
+        for bericht in "${berichte[@]}"; do
+          bericht="$(echo "$bericht" | tr -d '[:space:]')"
+          if [ -n "$bericht" ]; then
+            argumente+=(--report "$bericht")
+          fi
+        done
+        if [ "$CHINOOK_REQUIRE" = "true" ]; then
+          argumente+=(--require)
+        fi
+        echo "report=$CHINOOK_REPORT" >> "$GITHUB_OUTPUT"
+        status=0
+        python3 -m chinook.cli "${argumente[@]}" || status=$?
+        if [ -f "$CHINOOK_REPORT" ]; then
+          stand=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["aufseher"]["status"])' "$CHINOOK_REPORT")
+        else
+          stand="fehlgeschlagen"
+        fi
+        echo "status=$stand" >> "$GITHUB_OUTPUT"
+        exit "$status"

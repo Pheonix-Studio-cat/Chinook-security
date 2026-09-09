@@ -14,9 +14,9 @@ wird gemeldet.
 
 ## Stand
 
-Gebaut sind Etappe 1 und 2: das gemeinsame Befund-Format, **fünf Bots**, die
-Gegenprobe, und je eine composite action pro Bot für den Einbau in fremde
-Repos.
+Gebaut sind Etappe 1 bis 3: das gemeinsame Befund-Format, **fünf Bots**, die
+Gegenprobe, je eine composite action pro Bot — und der **Aufseher**, der die
+Befunde einordnet und die Bots kontrolliert.
 
 | Teil | Zustand |
 | --- | --- |
@@ -27,11 +27,11 @@ Repos.
 | **Code-Bot** | ✅ 12 Muster in Python, JavaScript, Shell |
 | **Lizenz-Bot** | ✅ was fehlt und was auseinandergeht |
 | Composite Action je Bot | ✅ auch aus fremden Repos nachgewiesen |
-| Gegenprobe | ✅ 20 Mutationen, alle gefangen |
-| Aufseher (KI-Schicht) | ⏳ Etappe 3 |
+| **Aufseher** (KI-Schicht) | ✅ ordnet ein, entfernt nie |
+| Gegenprobe | ✅ 25 Mutationen, alle gefangen |
 | Website | ⏳ Etappe 4 |
 
-**98 Prüfungen, alle grün. 20 Mutationen, alle gefangen.**
+**128 Prüfungen, alle grün. 25 Mutationen, alle gefangen.**
 
 **Keine Abhängigkeiten.** Nur die Python-Standardbibliothek. Ein
 Sicherheitswerkzeug mit dreihundert transitiven Paketen ist selbst eine
@@ -66,6 +66,19 @@ jobs:
       - uses: Pheonix-Studio-cat/Chinook-security/actions/code-bot@main
       - uses: Pheonix-Studio-cat/Chinook-security/actions/license-bot@main
 ```
+
+Der **Aufseher** kommt als eigener Schritt dazu, wenn man ihn will:
+
+```yaml
+      - uses: Pheonix-Studio-cat/Chinook-security/actions/overseer@main
+        env:
+          CHINOOK_AI_TOKEN: ${{ secrets.CHINOOK_AI_TOKEN }}
+        with:
+          reports: chinook-secret-bot.json,chinook-code-bot.json
+```
+
+Ohne das Secret wird er **übersprungen**, und der Lauf bleibt grün — die
+Befunde der Bots stehen dann unverändert da. Das ist Absicht, siehe unten.
 
 > ⚠️ `@main` ist zum Ausprobieren. Für den Dauerbetrieb auf einen Commit-SHA
 > festlegen — genau das, was der Workflow-Bot bei jeder anderen Action
@@ -202,16 +215,71 @@ Zuversicht sind entsprechend gekennzeichnet.
 
 ---
 
+## Der Aufseher
+
+Die KI-Schicht. Sie hat zwei Aufgaben, und die zweite ist die eigentliche.
+
+**Befunde einordnen.** Zu jedem Befund eine von vier Einschätzungen —
+`bestaetigt`, `vermutlich-echt`, `vermutlich-rauschen`, `unklar` — plus ein, zwei
+Sätze Begründung. Ohne Triage erstickt jeder Scanner-Rollout an Falschmeldungen.
+
+**Die Bots kontrollieren.** `python3 -m checks.counterproof --json …` schreibt
+das Ergebnis der Gegenprobe maschinenlesbar: welcher Bot absichtlich kaputt
+gemacht wurde, und ob die Prüfungen daraufhin rot wurden. Ein Bot, der gegen ein
+kaputtes Fixture grün bleibt, ist kaputt — und das steht dann da.
+
+### Drei Eigenschaften, die feststanden, bevor eine Zeile davon existierte
+
+| | |
+| --- | --- |
+| **Er zahlt nicht auf ein fremdes Konto** | Der Schlüssel kommt aus `CHINOOK_AI_TOKEN` im Repo dessen, der ihn einsetzt. Chinook hält keinen. |
+| **Er ist freiwillig** | Ohne Schlüssel läuft alles andere weiter. Ein Scanner, der ausfällt, weil ein Modell nicht antwortet, ist schlechter als keiner. |
+| **Er hat keine Werkzeuge und keine Schreibrechte** | Er liest zwangsläufig fremden Text — Pfade aus einem Fork, Paketnamen. Ein Modell mit Werkzeugen, das solchen Text liest, ist Prompt Injection mit Schreibzugriff. |
+
+### Und die Zusicherung, an der alles hängt
+
+> 🔒 **Kein Befund geht verloren.** Die Antwort des Modells kann nur ein Feld
+> `triage` an einen Befund hängen. Sie kann keinen entfernen, keinen
+> Schweregrad ändern und keinen erfinden.
+
+Technisch: die Ergebnisliste wird aus den **Befunden** aufgebaut, nie aus der
+Antwort. Was das Modell zu einem unbekannten Fingerabdruck sagt, fällt weg; eine
+Einschätzung außerhalb der vier erlaubten fällt weg; die Begründung wird von
+Steuerzeichen befreit und gekürzt. Sechs Prüfungen fahren genau diese Angriffe,
+und fünf Mutationen halten sie fest.
+
+Wegräumen bleibt eine Menschenentscheidung.
+
+### Wenn er nicht laufen kann
+
+| Fall | Was passiert |
+| --- | --- |
+| kein Schlüssel | `uebersprungen`, Rückgabewert `0` |
+| Anfrage scheitert / Modell lehnt ab | `fehlgeschlagen`, Rückgabewert `0` |
+| dasselbe mit `--require` | Rückgabewert `2` |
+
+Warum hier `0` und nicht `2` wie beim Dependency-Bot? Weil der Aufseher **kein
+Urteil fällt**. Die Bots haben ihres schon gefällt, und ihre Befunde stehen
+unverändert im Bericht. Wer ohne Einordnung nicht weitermachen will, nimmt
+`--require`.
+
+Der Aufruf geht an die Anthropic-Messages-API, Standardmodell `claude-opus-5`.
+Anderes Modell mit `--model`; andere Adresse mit `--api-url`. Andere Anbieter
+sprechen eine andere Request-Form — das steht in `docs/grenzen.md`.
+
+---
+
 ## Die Gegenprobe
 
 ```
-python3 -m checks.counterproof
+python3 -m checks.counterproof [--json gegenprobe.json]
 ```
 
 Sie kopiert das Repo, macht die Bots **absichtlich kaputt** — Redaktion
 abgeschaltet, eine Regel übersprungen, `is_pinned` gibt immer `True` zurück,
-der OSV-Fehler wird verschluckt — und verlangt, dass die Prüfungen daraufhin
-**rot** werden. Zwanzig Mutationen, alle gefangen. Jede Mutation prüft vorher,
+der OSV-Fehler wird verschluckt, der Aufseher lässt Befunde fallen — und
+verlangt, dass die Prüfungen daraufhin **rot** werden. Fünfundzwanzig
+Mutationen, alle gefangen. Jede Mutation prüft vorher,
 dass sie die Datei überhaupt verändert hat; ohne das könnte eine wirkungslose
 Mutation ein Urteil fällen.
 
@@ -226,6 +294,7 @@ absichtlich kaputten Zustand gelaufen ist, ist keine Prüfung.*
 chinook/            die Bots, nur Standardbibliothek
   findings.py       das gemeinsame Befund-Format, JSON und SARIF
   secret_bot.py  workflow_bot.py  dependency_bot.py  code_bot.py  license_bot.py
+  overseer.py       der Aufseher — ordnet ein, entfernt nie
   cli.py            python3 -m chinook.cli <bot> …
 actions/            je ein composite action pro Bot
 .github/workflows/  die Selbstprüfung
@@ -246,16 +315,10 @@ Repo wird von GitHubs Push-Protection blockiert und von Scannern gemeldet.
 
 ## Was noch nicht da ist
 
-Der Aufseher (Etappe 3) und die Website (Etappe 4). Der Aufseher wird drei
-Eigenschaften haben, die jetzt schon feststehen:
-
-- **Er zahlt nicht auf ein fremdes Konto.** Der Modellschlüssel kommt aus dem
-  Repo-Secret dessen, der ihn einsetzt.
-- **Er ist optional.** Fehlt der Schlüssel, laufen die Bots trotzdem.
-- **Er hat keine Schreibrechte und keine Werkzeuge.** Er liest zwangsläufig
-  fremden PR-Text; alles andere wäre Prompt Injection mit Schreibzugriff. Er
-  darf einen Befund einordnen, aber nie löschen — Wegräumen ist eine
-  Menschenentscheidung.
+Die Website (Etappe 4) und der wöchentliche Aufseher-Lauf (Etappe 5). Die
+Website wird statisch aus diesem Repo gebaut und zeigt neben den Bots auch den
+Stand der Gegenprobe — die Seite sagt dann nicht nur, dass geprüft wird,
+sondern ob die Prüfungen selbst bewiesen sind.
 
 ---
 

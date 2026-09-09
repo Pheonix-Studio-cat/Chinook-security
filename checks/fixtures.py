@@ -180,3 +180,111 @@ def schreibe_requirements(root: str, zeilen) -> str:
     with open(ziel, "w", encoding="utf-8") as handle:
         handle.write("\n".join(zeilen) + "\n")
     return ziel
+
+
+# --- Aufseher --------------------------------------------------------------
+
+
+class ModellStub:
+    """Ein Messages-API-Ersatz auf dem eigenen Rechner.
+
+    Der Aufseher wird nie gegen die echte Adresse gefahren: das kostet Geld,
+    haengt am Netz und liefert bei jedem Lauf etwas anderes. Was hier geprueft
+    wird, ist nicht das Modell, sondern **was Chinook mit dessen Antwort
+    macht** -- und das muss auch bei einer boesartigen Antwort stimmen.
+    """
+
+    def __init__(self, bewertungen=None, status: int = 200, koerper: bytes | None = None,
+                 stop_reason: str = "end_turn", text: str | None = None):
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        import threading
+
+        self.anfragen = []
+        stub = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):  # noqa: N802
+                laenge = int(self.headers.get("Content-Length", "0"))
+                stub.anfragen.append(
+                    {
+                        "koerper": _json.loads(self.rfile.read(laenge) or b"{}"),
+                        # Kopfzeilen sind laut HTTP gross-/kleinschreibungsblind;
+                        # urllib schickt sie kapitalisiert. Klein ablegen, sonst
+                        # prueft man die Schreibweise statt des Inhalts.
+                        "kopfzeilen": {k.lower(): v for k, v in self.headers.items()},
+                    }
+                )
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                if koerper is not None:
+                    nutzlast = koerper
+                else:
+                    inhalt = text if text is not None else _json.dumps(
+                        {"bewertungen": bewertungen or []}, ensure_ascii=False
+                    )
+                    nutzlast = _json.dumps(
+                        {
+                            "id": "msg_stub",
+                            "model": "claude-opus-5",
+                            "stop_reason": stop_reason,
+                            "content": [{"type": "text", "text": inhalt}],
+                        }
+                    ).encode()
+                self.send_header("Content-Length", str(len(nutzlast)))
+                self.end_headers()
+                self.wfile.write(nutzlast)
+
+            def log_message(self, *_args):
+                pass
+
+        self.server = HTTPServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+
+    @property
+    def url(self) -> str:
+        host, port = self.server.server_address[:2]
+        return f"http://{host}:{port}/v1/messages"
+
+    def __enter__(self) -> "ModellStub":
+        self.thread.start()
+        return self
+
+    def __exit__(self, *_ausnahme) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=5)
+
+
+def schreibe_bericht(pfad: str, befunde) -> str:
+    """Ein Befundbericht im Chinook-Format, wie ihn ein Bot schreibt."""
+    with open(pfad, "w", encoding="utf-8") as handle:
+        _json.dump(
+            {
+                "schema_version": "1",
+                "bot": "secret-bot",
+                "generated_at": "2026-01-01T00:00:00Z",
+                "target": {},
+                "summary": {"total": len(befunde), "by_severity": {}},
+                "findings": befunde,
+            },
+            handle,
+        )
+    return pfad
+
+
+def befund(fingerprint: str, **felder) -> dict:
+    grund = {
+        "id": "secret-bot/github-token",
+        "bot": "secret-bot",
+        "rule": "github-token",
+        "title": "GitHub-Token im Quelltext",
+        "severity": "critical",
+        "confidence": "high",
+        "location": {"path": "src/konfiguration.py", "line": 4},
+        "explanation": "Erklaerung",
+        "remediation": "Gegenmittel",
+        "evidence": "github-token, 40 Zeichen (Wert wird nicht ausgegeben)",
+        "fingerprint": fingerprint,
+    }
+    grund.update(felder)
+    return grund
