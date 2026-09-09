@@ -26,6 +26,7 @@ jobs:
       - name: Gegenprobe -- jede Mutation muss die Pruefungen rot machen
         run: python3 -m checks.counterproof
 
+      # Alle fuenf Bots auf das eigene Repo, ohne Ausnahmeliste.
       - name: Secret-Bot auf das eigene Repo
         uses: ./actions/secret-bot
         with:
@@ -38,3 +39,45 @@ jobs:
         with:
           fail-on: medium
           sarif: ""
+
+      - name: Code-Bot auf das eigene Repo
+        uses: ./actions/code-bot
+        with:
+          fail-on: medium
+          sarif: ""
+
+      - name: Lizenz-Bot auf das eigene Repo
+        uses: ./actions/license-bot
+        with:
+          fail-on: medium
+          sarif: ""
+
+      - name: Dependency-Bot auf das eigene Repo
+        uses: ./actions/dependency-bot
+        with:
+          fail-on: medium
+          sarif: ""
+
+  # Der einzige Schritt, der an einem fremden Dienst haengt. Er darf fehlschlagen,
+  # ohne den Lauf zu kippen: er ist **Auskunft** darueber, ob OSV gerade
+  # antwortet, keine Zusicherung ueber Chinook. Die Bot-Logik selbst wird in
+  # `checks/test_dependency_bot.py` gegen einen eigenen Stub gefahren.
+  netzprobe:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Erreicht die OSV-Abfrage die echte Adresse?
+        run: |
+          set -uo pipefail
+          arbeitsordner=$(mktemp -d)
+          printf 'django==2.2.0\n' > "$arbeitsordner/requirements.txt"
+          python3 -m chinook.cli dependency-bot --path "$arbeitsordner" --fail-on never
+          status=$?
+          rm -rf "$arbeitsordner"
+          if [ "$status" -eq 2 ]; then
+            echo "OSV war nicht erreichbar. Das sagt nichts ueber Chinook aus." >&2
+            exit 1
+          fi
+          exit 0

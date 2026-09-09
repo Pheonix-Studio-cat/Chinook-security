@@ -10,12 +10,20 @@ import os
 import sys
 
 from . import findings as fmt
-from . import secret_bot, workflow_bot
+from . import code_bot, dependency_bot, license_bot, secret_bot, workflow_bot
 
 BOTS = {
     "secret-bot": secret_bot,
     "workflow-bot": workflow_bot,
+    "dependency-bot": dependency_bot,
+    "code-bot": code_bot,
+    "license-bot": license_bot,
 }
+
+# Rueckgabewerte: 0 sauber, 1 Befunde ab der Schwelle, 2 der Lauf konnte nichts
+# feststellen. Die 2 ist der Grund, warum es sie gibt -- ein Abruf, der nicht
+# durchkam, ist kein leeres Ergebnis.
+OK, BEFUNDE, UNBEWIESEN = 0, 1, 2
 
 _SEVERITY_LABEL = {
     "critical": "kritisch",
@@ -46,6 +54,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", dest="json_out", default="", help="Bericht als JSON")
     parser.add_argument("--sarif", dest="sarif_out", default="", help="Bericht als SARIF")
     parser.add_argument(
+        "--osv-url",
+        default=dependency_bot.OSV_URL,
+        help="Adresse der OSV-Abfrage (nur dependency-bot; fuer Pruefungen)",
+    )
+    parser.add_argument(
+        "--osv-timeout",
+        type=int,
+        default=dependency_bot.TIMEOUT,
+        help="Zeitgrenze der OSV-Abfrage in Sekunden (nur dependency-bot)",
+    )
+    parser.add_argument(
         "--fail-on",
         default="high",
         choices=(*fmt.SEVERITIES, "never"),
@@ -68,10 +87,23 @@ def main(argv=None) -> int:
     module = BOTS[args.bot]
     excludes = _split(args.exclude)
 
-    if args.bot == "secret-bot":
-        results = module.run(args.path, excludes, history=args.history)
-    else:
-        results = module.run(args.path, excludes)
+    try:
+        if args.bot == "secret-bot":
+            results = module.run(args.path, excludes, history=args.history)
+        elif args.bot == "dependency-bot":
+            results = module.run(
+                args.path, excludes, url=args.osv_url, timeout=args.osv_timeout
+            )
+        else:
+            results = module.run(args.path, excludes)
+    except dependency_bot.OsvUnavailable as fehler:
+        print(
+            f"{args.bot}: die Abfrage ist fehlgeschlagen -- {fehler}\n"
+            "Dieser Lauf sagt nichts darueber aus, ob Schwachstellen vorliegen. "
+            "Er gilt deshalb nicht als bestanden.",
+            file=sys.stderr,
+        )
+        return UNBEWIESEN
 
     report = fmt.report(args.bot, results, target={"path": os.path.abspath(args.path)})
     if args.json_out:
@@ -96,8 +128,8 @@ def main(argv=None) -> int:
             f"'{_SEVERITY_LABEL.get(args.fail_on, args.fail_on)}'.",
             file=sys.stderr,
         )
-        return 1
-    return 0
+        return BEFUNDE
+    return OK
 
 
 if __name__ == "__main__":

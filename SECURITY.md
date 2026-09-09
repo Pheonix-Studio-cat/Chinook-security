@@ -18,6 +18,9 @@ und ein möglichst kleiner Fall, der es zeigt.
 | Die Bots führen keinen fremden Code aus | sie lesen Dateien und gleichen Muster ab, sie starten nichts aus dem geprüften Repo |
 | Die eigenen Workflows halten die eigenen Regeln ein | `test_die_eigenen_workflows_sind_sauber` |
 | Kein Geheimnis im Repo | der Secret-Bot läuft bei jeder Selbstprüfung über sein eigenes Repo, mit History |
+| Ein Lauf, der nichts feststellen konnte, gilt nicht als bestanden | Rückgabewert `2`, gegengeprüft mit `unbewiesen-gilt-als-bestanden` |
+| Der Lizenz-Bot behauptet keine Lizenz | `KeineRechtsaussageTest` in `checks/test_license_bot.py` |
+| Die aufgerufene Fassung ist festgelegt | leeres `job_workflow_sha` bricht den Workflow ab, statt irgendeine Fassung zu holen |
 
 ## Was Chinook **nicht** verspricht
 
@@ -29,6 +32,10 @@ und ein möglichst kleiner Fall, der es zeigt.
   Dokumentstruktur. Die Grenze steht in `docs/grenzen.md`.
 - **Keine Erkennungsraten.** Es gibt hier keine Prozentzahlen, weil es keine
   Messung gibt, die sie belegt.
+- **Keine eigene Einstufung von Schwachstellen.** Jede bekannte Schwachstelle
+  ist „hoch". Chinook rechnet kein CVSS aus.
+- **Keine Rechtsauskunft.** Der Lizenz-Bot meldet, was fehlt und was
+  auseinandergeht. Was daraus folgt, entscheidet ein Mensch.
 
 ## Wenn der Secret-Bot etwas findet
 

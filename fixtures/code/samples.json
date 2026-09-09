@@ -1,0 +1,71 @@
+{
+  "_hinweis": [
+    "Absichtlich kaputte Zeilen fuer den Code-Bot, je eine pro Regel, dazu eine",
+    "saubere Gegenzeile. Sie liegen als JSON, nicht als .py/.js/.sh -- sonst",
+    "wuerde der Code-Bot beim Lauf ueber das eigene Repo seine eigenen Fixtures",
+    "melden. Die Pruefungen schreiben sie zur Laufzeit in eine Datei mit der",
+    "passenden Endung."
+  ],
+  "regeln": {
+    "python-eval-exec": {
+      "suffix": ".py",
+      "kaputt": "ergebnis = eval(anfrage[\"ausdruck\"])",
+      "sauber": "ergebnis = json.loads(anfrage[\"ausdruck\"])"
+    },
+    "python-subprocess-shell": {
+      "suffix": ".py",
+      "kaputt": "subprocess.run(f\"git log {pfad}\", shell=True)",
+      "sauber": "subprocess.run([\"git\", \"log\", pfad])"
+    },
+    "python-pickle-load": {
+      "suffix": ".py",
+      "kaputt": "daten = pickle.loads(koerper)",
+      "sauber": "daten = json.loads(koerper)"
+    },
+    "python-yaml-unsafe": {
+      "suffix": ".py",
+      "kaputt": "daten = yaml.load(text)",
+      "sauber": "daten = yaml.safe_load(text)"
+    },
+    "python-tls-verify-off": {
+      "suffix": ".py",
+      "kaputt": "antwort = requests.get(url, verify=False)",
+      "sauber": "antwort = requests.get(url)"
+    },
+    "python-tempfile-mktemp": {
+      "suffix": ".py",
+      "kaputt": "pfad = tempfile.mktemp()",
+      "sauber": "griff, pfad = tempfile.mkstemp()"
+    },
+    "js-eval": {
+      "suffix": ".js",
+      "kaputt": "const wert = eval(eingabe);",
+      "sauber": "const wert = JSON.parse(eingabe);"
+    },
+    "js-child-process-shell": {
+      "suffix": ".js",
+      "kaputt": "cp.exec(`ls ${verzeichnis}`);",
+      "sauber": "cp.execFile('ls', [verzeichnis]);"
+    },
+    "js-innerhtml": {
+      "suffix": ".js",
+      "kaputt": "element.innerHTML = name;",
+      "sauber": "element.textContent = name;"
+    },
+    "js-tls-verify-off": {
+      "suffix": ".js",
+      "kaputt": "const optionen = { rejectUnauthorized: false };",
+      "sauber": "const optionen = { rejectUnauthorized: true };"
+    },
+    "shell-curl-pipe-shell": {
+      "suffix": ".sh",
+      "kaputt": "curl -sL https://example.invalid/install.sh | sh",
+      "sauber": "curl -sLo install.sh https://example.invalid/install.sh"
+    },
+    "shell-eval": {
+      "suffix": ".sh",
+      "kaputt": "eval \"$befehl\"",
+      "sauber": "\"${teile[@]}\""
+    }
+  }
+}
