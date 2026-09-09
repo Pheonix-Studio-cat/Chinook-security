@@ -27,7 +27,6 @@ OSV_VULN_URL = "https://osv.dev/vulnerability/"
 BATCH = 500
 TIMEOUT = 30
 
-MANIFESTS = ("requirements.txt", "package-lock.json", "go.mod")
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build"}
 
 
@@ -165,10 +164,161 @@ def parse_go_mod(text: str, path: str) -> tuple[list[Dependency], list[Finding]]
     return deps, []
 
 
+_TOML_NAME = re.compile(r'^\s*name\s*=\s*"([^"]+)"')
+_TOML_VERSION = re.compile(r'^\s*version\s*=\s*"([^"]+)"')
+
+
+def _toml_pakete(text: str, path: str, ecosystem: str):
+    """`[[package]]`-Bloecke, wie sie `poetry.lock` und `Cargo.lock` benutzen.
+
+    Zeilenweise, ohne TOML-Leser -- dieselbe Entscheidung wie beim
+    Workflow-Bot, und dieselbe Grenze: Bloecke, die von der ueblichen Form
+    abweichen, werden nicht erkannt.
+    """
+    deps: list[Dependency] = []
+    name = version = ""
+    zeile = 0
+    im_block = False
+
+    def abschliessen():
+        if im_block and name and version:
+            deps.append(Dependency(name, version, ecosystem, path, zeile))
+
+    for nummer, roh in enumerate(text.splitlines(), start=1):
+        if roh.strip() == "[[package]]":
+            abschliessen()
+            im_block, name, version, zeile = True, "", "", nummer
+            continue
+        if roh.startswith("[") and roh.strip() != "[[package]]":
+            abschliessen()
+            im_block, name, version = False, "", ""
+            continue
+        if not im_block:
+            continue
+        if not name:
+            treffer = _TOML_NAME.match(roh)
+            if treffer:
+                name = treffer.group(1)
+                continue
+        if not version:
+            treffer = _TOML_VERSION.match(roh)
+            if treffer:
+                version = treffer.group(1)
+    abschliessen()
+    return deps, []
+
+
+def parse_poetry_lock(text: str, path: str):
+    return _toml_pakete(text, path, "PyPI")
+
+
+def parse_cargo_lock(text: str, path: str):
+    return _toml_pakete(text, path, "crates.io")
+
+
+def _npm_name(spec: str) -> str:
+    """Der Paketname aus einer yarn-/pnpm-Angabe.
+
+    `lodash@^4.17.20`, `"@scope/x@npm:^1.0.0"`, `/lodash@4.17.21` -- der Name
+    ist alles vor dem **letzten** `@`, das nicht am Anfang steht. Ein fuehrendes
+    `@` gehoert zum Namensraum, nicht zur Version.
+    """
+    spec = spec.strip().strip('"\'').lstrip("/")
+    trenner = spec.rfind("@")
+    if trenner <= 0:
+        return spec
+    return spec[:trenner]
+
+
+# Der Schluessel darf Doppelpunkte enthalten: Berry schreibt
+# `"@scope/x@npm:^1.0.0":`. Nur der letzte zaehlt.
+_YARN_SCHLUESSEL = re.compile(r"""^(?P<spec>["']?[^\s#].*?)["']?:\s*$""")
+_YARN_VERSION = re.compile(r"""^\s+version[:\s]+["']?(?P<version>[^"'\s]+)["']?\s*$""")
+
+
+def parse_yarn_lock(text: str, path: str):
+    """`yarn.lock`, Format 1 wie Berry."""
+    deps: list[Dependency] = []
+    name = ""
+    zeile = 0
+    for nummer, roh in enumerate(text.splitlines(), start=1):
+        if not roh.strip() or roh.lstrip().startswith("#"):
+            continue
+        if not roh[0].isspace():
+            treffer = _YARN_SCHLUESSEL.match(roh)
+            name = _npm_name(treffer.group("spec").split(",")[0]) if treffer else ""
+            zeile = nummer
+            continue
+        if name:
+            treffer = _YARN_VERSION.match(roh)
+            if treffer:
+                deps.append(Dependency(name, treffer.group("version"), "npm", path, zeile))
+                name = ""
+    return deps, []
+
+
+_PNPM_EINTRAG = re.compile(r"""^\s{2,}["']?(?P<spec>/?[^:\s"']+)["']?:\s*$""")
+
+
+def parse_pnpm_lock(text: str, path: str):
+    """`pnpm-lock.yaml`. Erkannt werden `/name@version`, `name@version` und
+    die aeltere Form `/name/version`."""
+    deps: list[Dependency] = []
+    im_paketteil = False
+    for nummer, roh in enumerate(text.splitlines(), start=1):
+        if roh.startswith("packages:"):
+            im_paketteil = True
+            continue
+        if im_paketteil and roh and not roh[0].isspace():
+            im_paketteil = False
+            continue
+        if not im_paketteil:
+            continue
+        treffer = _PNPM_EINTRAG.match(roh)
+        if not treffer:
+            continue
+        spec = treffer.group("spec").lstrip("/")
+        if "@" in spec.lstrip("@"):
+            name, version = _npm_name(spec), spec[spec.rfind("@") + 1 :]
+        else:
+            teile = spec.rsplit("/", 1)
+            if len(teile) != 2 or not teile[1][:1].isdigit():
+                continue
+            name, version = teile
+        if name and version:
+            deps.append(Dependency(name, version, "npm", path, nummer))
+    return deps, []
+
+
+def parse_composer_lock(text: str, path: str):
+    """`composer.lock` -- JSON, `packages` und `packages-dev`."""
+    try:
+        daten = json.loads(text)
+    except json.JSONDecodeError:
+        return [], []
+    deps: list[Dependency] = []
+    for schluessel in ("packages", "packages-dev"):
+        for eintrag in daten.get(schluessel) or []:
+            if not isinstance(eintrag, dict):
+                continue
+            name = eintrag.get("name", "")
+            version = str(eintrag.get("version", "")).lstrip("v")
+            if name and version:
+                deps.append(
+                    Dependency(name, version, "Packagist", path, _line_of(text, f'"{name}"'))
+                )
+    return deps, []
+
+
 PARSER = {
     "requirements.txt": parse_requirements,
     "package-lock.json": parse_package_lock,
     "go.mod": parse_go_mod,
+    "poetry.lock": parse_poetry_lock,
+    "Cargo.lock": parse_cargo_lock,
+    "yarn.lock": parse_yarn_lock,
+    "pnpm-lock.yaml": parse_pnpm_lock,
+    "composer.lock": parse_composer_lock,
 }
 
 
@@ -299,7 +449,8 @@ REGELN = (
         "schwere": "low",
         "was": (
             "Ohne `==` installiert jeder Lauf moeglicherweise etwas anderes, "
-            "und die Pruefung sagt nichts ueber das aus, was installiert wird."
+            "und die Pruefung sagt nichts ueber das aus, was installiert wird. "
+            "Nur bei `requirements.txt` -- eine Sperrdatei legt sich von selbst fest."
         ),
     },
 )

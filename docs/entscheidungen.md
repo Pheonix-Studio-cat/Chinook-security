@@ -236,9 +236,23 @@ Sonst führt GitHub sie aus. Eine Prüfung hält das fest.
 
 ---
 
-## Der eigene `actions/checkout` ist noch nicht auf einen SHA festgelegt
+## Die eigenen Actions sind auf Commits festgelegt
 
-Der Workflow-Bot meldet das an den eigenen Workflows — inzwischen elfmal, als
-Hinweis, weil `actions/*` GitHub selbst gehört. Es bleibt trotzdem offen: der SHA wird
-eingetragen, sobald er verifiziert vorliegt. Einen SHA zu erfinden, damit die
-eigene Prüfung schöner aussieht, ist keine Option.
+Erledigt am 2026-09-09. Jede `uses:`-Zeile in `.github/workflows/` zeigt auf
+einen vollen Commit-SHA, mit dem lesbaren Tag als Kommentar dahinter — genau
+das, was der Workflow-Bot von jedem verlangt.
+
+Die SHAs sind **vom Remote geholt**, nicht aus dem Gedächtnis:
+
+```
+git ls-remote https://github.com/actions/checkout refs/tags/v4
+```
+
+Vorher stand hier, dass sie fehlen, weil kein verifizierter vorlag — einen zu
+erfinden, damit die eigene Prüfung schöner aussieht, war keine Option. Der
+Eintrag bleibt als Beleg dafür stehen, dass „ich weiß es nicht" ein
+vollständiger Zustand ist, bis man es weiß.
+
+Zwei Prüfungen halten es: der Workflow-Bot läuft über die eigenen Workflows
+jetzt mit Schwelle `info` — also ohne jede Nachsicht —, und eine zweite geht
+jede `uses:`-Zeile durch und verlangt einen 40-stelligen SHA.

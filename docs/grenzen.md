@@ -38,18 +38,33 @@ gefunden. Die Regeln stehen vollständig in `chinook/secret_bot.py` und
 - **`unpinned-action`** meldet jeden Ref, der kein voller 40-stelliger SHA ist.
   Ein Tag ist kein Beweis für Unsicherheit — er ist eine Zusage, die jemand
   anderes zurücknehmen kann.
-- **`script-injection`** prüft nur `run:`-Blöcke. Fremder Kontext in `with:`
-  einer Fremd-Action kann ebenfalls gefährlich sein und wird noch nicht erfasst.
+- **`script-injection`** prüft `run:`- und `script:`-Blöcke — beides wird
+  ausgeführt. Ein Wert in `with:` einer anderen Action wird dagegen als
+  **Eingabe** übergeben und ist nicht von sich aus gefährlich; ob die Action ihn
+  in eine Shell einsetzt, sieht der Bot nicht. Dieser Fall wird deshalb bewusst
+  **nicht** gemeldet — eine Regel, die jede Eingabe anmahnt, wäre Rauschen.
 - **Kein Blick auf die Repo-Einstellungen.** Ob die Standardrechte eng oder weit
   sind, steht nicht in der Datei; deshalb ist `permissions-missing` „mittel"
   und nicht „hoch".
 
 ## Dependency-Bot
 
-- **Nur Sperrdateien**, und nur die drei Formate `requirements.txt`,
-  `package-lock.json`, `go.mod`. Kein `poetry.lock`, kein `yarn.lock`, kein
-  `Cargo.lock`, kein `pom.xml`. Wo nichts gelesen wird, wird auch nichts
-  gefragt — und dann ist ein leeres Ergebnis wirklich leer.
+- **Nur Sperrdateien**, und nur acht Formate: `requirements.txt`,
+  `poetry.lock`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `go.mod`,
+  `Cargo.lock`, `composer.lock`. Kein Maven, kein Gradle, kein NuGet, kein
+  `Gemfile.lock`. Wo nichts gelesen wird, wird auch nichts gefragt — und dann
+  ist ein leeres Ergebnis wirklich leer.
+- **Zeilenweise gelesen, nicht mit einem Leser des jeweiligen Formats.** Für
+  `poetry.lock`, `Cargo.lock`, `yarn.lock` und `pnpm-lock.yaml` heisst das:
+  übliche Formen ja, Sonderfälle nein. Dieselbe Entscheidung wie beim
+  Workflow-Bot und derselbe Preis.
+- **`pnpm-lock.yaml` Format 9 führt jedes Paket zweimal auf** — unter
+  `packages:` und noch einmal unter `snapshots:`. Gelesen wird nur der erste
+  Abschnitt; sonst würde jedes Paket doppelt abgefragt.
+- **Die Ökosystem-Namen sind Zeichenketten**, die OSV kennen muss. Ein falsch
+  geschriebener Name fände nichts, und nichts sähe aus wie „sauber". Ob OSV sie
+  kennt, prüft `checks/oekosystemprobe.py` gegen den echten Dienst — die
+  Prüfungen im Repo können es nicht.
 - **`requirements.txt` nur mit `==`.** Eine Spanne beschreibt nicht, was
   installiert wird; sie wird als `dependency-unpinned` gemeldet statt geraten.
 - **Er haengt an einem fremden Dienst.** OSV.dev muss erreichbar sein. Ist es

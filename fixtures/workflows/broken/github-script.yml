@@ -1,0 +1,17 @@
+# Kaputt mit Absicht: fremder Text in actions/github-script.
+# `script:` ist JavaScript und wird ausgefuehrt wie `run:` eine Shell.
+name: github-script
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+jobs:
+  begruessen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@0123456789abcdef0123456789abcdef01234567
+        with:
+          script: |
+            const titel = "${{ github.event.issue.title }}";
+            console.log(titel);
