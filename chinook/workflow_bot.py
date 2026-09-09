@@ -23,7 +23,11 @@ WORKFLOW_SUFFIXES = (".yml", ".yaml")
 
 _SHA = re.compile(r"^[0-9a-f]{40}$")
 _USES = re.compile(r"^\s*(?:-\s*)?uses:\s*['\"]?([^'\"\s#]+)['\"]?")
-_RUN_START = re.compile(r"^(\s*)(?:-\s*)?run:\s*(.*)$")
+# `run:` ist die Shell, `script:` ist `actions/github-script` -- beide fuehren
+# aus, was in ihnen steht. Ein Wert in `with:` einer anderen Action wird
+# dagegen als Eingabe uebergeben und ist nicht von sich aus gefaehrlich;
+# deshalb steht der Fall in `docs/grenzen.md` und nicht in dieser Regel.
+_RUN_START = re.compile(r"^(\s*)(?:-\s*)?(?:run|script):\s*(.*)$")
 _TOP_LEVEL_KEY = re.compile(r"^([A-Za-z_][A-Za-z0-9_\-]*):")
 
 # Actions aus diesen Namensraeumen gehoeren GitHub selbst. Ein Tag statt eines
@@ -82,7 +86,7 @@ def iter_workflow_files(root: str):
 
 
 def _run_block_lines(lines: list[str]) -> set[int]:
-    """Zeilennummern (1-basiert), die zu einem `run:`-Block gehoeren."""
+    """Zeilennummern (1-basiert), die zu einem `run:`- oder `script:`-Block gehoeren."""
     inside: set[int] = set()
     index = 0
     while index < len(lines):
@@ -211,8 +215,9 @@ def scan_workflow(text: str, path: str) -> list[Finding]:
                             explanation=(
                                 f"`{context}` wird von dem geschrieben, der den PR oder den "
                                 "Kommentar verfasst, und vor der Ausfuehrung direkt in das "
-                                "Skript eingesetzt. Ein Backtick oder ein Semikolon darin "
-                                "ist dann ein Befehl."
+                                "Skript eingesetzt -- in `run:` in die Shell, in `script:` "
+                                "in JavaScript. Ein Backtick oder ein Semikolon darin ist "
+                                "dann ein Befehl."
                             ),
                             remediation=(
                                 "Den Wert ueber `env:` an den Schritt geben und im Skript "
@@ -282,7 +287,8 @@ REGELN = (
         "schwere": "high",
         "was": (
             "Ein Titel oder Kommentar wird vor der Ausfuehrung in einen "
-            "`run:`-Block eingesetzt. Ein Backtick darin ist dann ein Befehl."
+            "`run:`- oder `script:`-Block eingesetzt. Ein Backtick darin ist "
+            "dann ein Befehl."
         ),
     },
     {

@@ -20,6 +20,7 @@ SAUBER = WURZEL / "fixtures" / "workflows" / "clean"
 ERWARTET = {
     "unpinned.yml": "unpinned-action",
     "injection.yml": "script-injection",
+    "github-script.yml": "script-injection",
     "pr-target.yml": "pull-request-target-checkout",
     "write-all.yml": "permissions-write-all",
 }
@@ -104,6 +105,28 @@ class InjektionTest(unittest.TestCase):
         self.assertEqual([f.rule for f in sicher], [])
         self.assertEqual([f.rule for f in unsicher], ["script-injection"])
 
+    def test_erkennt_auch_github_script(self):
+        """`script:` ist JavaScript und wird ausgefuehrt wie `run:` eine Shell."""
+        text = (
+            "permissions:\n  contents: read\njobs:\n  a:\n    steps:\n"
+            "      - uses: actions/github-script@0123456789abcdef0123456789abcdef01234567\n"
+            "        with:\n"
+            "          script: |\n"
+            '            const t = "${{ github.event.issue.title }}";\n'
+        )
+        self.assertEqual([f.rule for f in scan_workflow(text, "w.yml")], ["script-injection"])
+
+    def test_ein_wert_in_with_ist_kein_befund(self):
+        """Ein Wert, der als Eingabe uebergeben wird, ist nicht von sich aus
+        gefaehrlich -- die Regel greift nur, wo etwas ausgefuehrt wird."""
+        text = (
+            "permissions:\n  contents: read\njobs:\n  a:\n    steps:\n"
+            "      - uses: fremd/action@0123456789abcdef0123456789abcdef01234567\n"
+            "        with:\n"
+            "          titel: ${{ github.event.issue.title }}\n"
+        )
+        self.assertEqual(scan_workflow(text, "w.yml"), [])
+
     def test_erkennt_den_mehrzeiligen_block(self):
         text = (
             "permissions:\n  contents: read\njobs:\n  a:\n    steps:\n"
@@ -145,12 +168,28 @@ class BefundTest(unittest.TestCase):
 
 class EigenesRepoTest(unittest.TestCase):
     def test_die_eigenen_workflows_sind_sauber(self):
-        treffer = [
-            f"{f.path}:{f.line} {f.rule}"
-            for f in run(str(WURZEL))
-            if f.severity != "info"
-        ]
+        """Ohne Nachsicht: auch kein Hinweis.
+
+        Seit die eigenen Actions auf Commits festgelegt sind, gibt es keinen
+        Grund mehr fuer eine Ausnahme. Was Chinook bei anderen anmahnt, haelt
+        es selbst -- und ein Rueckfall faellt hier auf.
+        """
+        treffer = [f"{f.path}:{f.line} {f.rule}" for f in run(str(WURZEL))]
         self.assertEqual(treffer, [], "der Workflow-Bot findet etwas in den eigenen Workflows")
+
+    def test_jede_eigene_action_ist_auf_einen_commit_festgelegt(self):
+        import re
+
+        for datei in sorted((WURZEL / ".github" / "workflows").glob("*.yml")):
+            for zeile, text in enumerate(datei.read_text(encoding="utf-8").splitlines(), start=1):
+                treffer = re.match(r"^\s*(?:-\s*)?uses:\s*([^\s#]+)", text)
+                if not treffer or treffer.group(1).startswith("./"):
+                    continue
+                with self.subTest(datei=datei.name, zeile=zeile):
+                    ref = treffer.group(1).split("@", 1)[1] if "@" in treffer.group(1) else ""
+                    self.assertTrue(
+                        is_pinned(ref), f"{datei.name}:{zeile} zeigt auf {ref!r}"
+                    )
 
     def test_die_fixtures_liegen_nicht_in_github_workflows(self):
         # Sonst wuerde GitHub die kaputten Workflows ausfuehren.

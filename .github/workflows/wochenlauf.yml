@@ -17,7 +17,7 @@ jobs:
   aufseher:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
@@ -51,6 +51,12 @@ jobs:
         with:
           fail-on: medium
           sarif: ""
+
+      # Haengt an einem fremden Dienst und darf deshalb fehlschlagen, ohne den
+      # Lauf zu kippen -- Auskunft ueber OSV, nicht ueber Chinook.
+      - name: Kennt OSV die Oekosystem-Namen?
+        continue-on-error: true
+        run: python3 -m checks.oekosystemprobe
 
       # Der einzige Schritt, der ueber die Woche etwas Neues erfahren kann:
       # OSV kennt heute Advisories, die es letzte Woche nicht kannte.

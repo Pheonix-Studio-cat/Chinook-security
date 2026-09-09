@@ -11,11 +11,17 @@ import tempfile
 import unittest
 
 from chinook.dependency_bot import (
+    PARSER,
     OsvUnavailable,
     collect,
+    parse_cargo_lock,
+    parse_composer_lock,
     parse_go_mod,
     parse_package_lock,
+    parse_pnpm_lock,
+    parse_poetry_lock,
     parse_requirements,
+    parse_yarn_lock,
     query_osv,
     run,
     to_findings,
@@ -72,12 +78,163 @@ class ParserTest(unittest.TestCase):
         self.assertEqual(parse_package_lock("{kein json", "package-lock.json"), ([], []))
 
 
+class WeitereSperrdateienTest(unittest.TestCase):
+    """poetry, Cargo, yarn, pnpm, composer -- je Format seine eigenen Fallen."""
+
+    def test_poetry_lock(self):
+        text = (
+            '[[package]]\nname = "certifi"\nversion = "2023.7.22"\n'
+            'description = "irgendwas"\n\n'
+            '[[package]]\nname = "urllib3"\nversion = "2.0.7"\n\n'
+            "[metadata]\nlock-version = \"2.0\"\n"
+        )
+        deps, _ = parse_poetry_lock(text, "poetry.lock")
+        self.assertEqual(
+            [(d.name, d.version, d.ecosystem) for d in deps],
+            [("certifi", "2023.7.22", "PyPI"), ("urllib3", "2.0.7", "PyPI")],
+        )
+
+    def test_poetry_metadata_ist_kein_paket(self):
+        text = '[metadata]\nname = "nicht-ein-paket"\nversion = "1.0"\n'
+        self.assertEqual(parse_poetry_lock(text, "poetry.lock")[0], [])
+
+    def test_cargo_lock(self):
+        text = '[[package]]\nname = "serde"\nversion = "1.0.188"\n'
+        deps, _ = parse_cargo_lock(text, "Cargo.lock")
+        self.assertEqual([(d.name, d.version, d.ecosystem) for d in deps], [("serde", "1.0.188", "crates.io")])
+
+    def test_yarn_lock_format_1(self):
+        deps, _ = parse_yarn_lock('lodash@^4.17.20:\n  version "4.17.21"\n', "yarn.lock")
+        self.assertEqual([(d.name, d.version) for d in deps], [("lodash", "4.17.21")])
+
+    def test_yarn_lock_berry_mit_doppelpunkt_im_schluessel(self):
+        # `npm:` im Schluessel hat den ersten Entwurf zum Stolpern gebracht.
+        deps, _ = parse_yarn_lock('"@scope/x@npm:^1.0.0":\n  version: 1.2.3\n', "yarn.lock")
+        self.assertEqual([(d.name, d.version) for d in deps], [("@scope/x", "1.2.3")])
+
+    def test_yarn_lock_mehrere_angaben_je_eintrag(self):
+        deps, _ = parse_yarn_lock('chalk@^4.0.0, chalk@^4.1.0:\n  version "4.1.2"\n', "yarn.lock")
+        self.assertEqual([(d.name, d.version) for d in deps], [("chalk", "4.1.2")])
+
+    def test_pnpm_lock_drei_formen(self):
+        text = (
+            "packages:\n"
+            "  /lodash@4.17.21:\n    resolution: {}\n"
+            "  /alt/1.0.0:\n    resolution: {}\n"
+            "  '@scope/y@2.0.0':\n    resolution: {}\n"
+        )
+        deps, _ = parse_pnpm_lock(text, "pnpm-lock.yaml")
+        self.assertEqual(
+            sorted((d.name, d.version) for d in deps),
+            [("@scope/y", "2.0.0"), ("alt", "1.0.0"), ("lodash", "4.17.21")],
+        )
+
+    def test_pnpm_nur_der_paketteil(self):
+        """`snapshots:` fuehrt in Format 9 dieselben Pakete ein zweites Mal.
+
+        Diese Pruefung stand zuerst da und bewies nichts -- die Gegenprobe hat
+        das aufgedeckt: die Mutation, die den Abschnittswaechter entfernt, blieb
+        gruen, weil die Beispieldatei gar keine Zeile enthielt, die faelschlich
+        als Paket durchgegangen waere. Jetzt enthaelt sie eine.
+        """
+        text = (
+            "lockfileVersion: '9.0'\n\n"
+            "settings:\n  autoInstallPeers: true\n\n"
+            "packages:\n\n"
+            "  chalk@4.1.2:\n    resolution: {integrity: sha512-x}\n\n"
+            "snapshots:\n\n"
+            "  chalk@4.1.2:\n    dependencies:\n      ansi-styles: 4.3.0\n"
+        )
+        deps, _ = parse_pnpm_lock(text, "pnpm-lock.yaml")
+        self.assertEqual(
+            [(d.name, d.version) for d in deps],
+            [("chalk", "4.1.2")],
+            "jedes Paket genau einmal -- sonst wird es doppelt abgefragt",
+        )
+
+    def test_pnpm_ohne_paketteil(self):
+        text = "lockfileVersion: '6.0'\n\nsettings:\n  autoInstallPeers: true\n"
+        self.assertEqual(parse_pnpm_lock(text, "pnpm-lock.yaml")[0], [])
+
+    def test_composer_lock_mit_und_ohne_v(self):
+        text = json.dumps(
+            {
+                "packages": [{"name": "monolog/monolog", "version": "v2.9.1"}],
+                "packages-dev": [{"name": "phpunit/phpunit", "version": "10.0.0"}],
+            }
+        )
+        deps, _ = parse_composer_lock(text, "composer.lock")
+        self.assertEqual(
+            sorted((d.name, d.version, d.ecosystem) for d in deps),
+            [("monolog/monolog", "2.9.1", "Packagist"), ("phpunit/phpunit", "10.0.0", "Packagist")],
+        )
+
+    def test_jede_sperrdatei_hat_einen_parser(self):
+        self.assertEqual(
+            sorted(PARSER),
+            [
+                "Cargo.lock",
+                "composer.lock",
+                "go.mod",
+                "package-lock.json",
+                "pnpm-lock.yaml",
+                "poetry.lock",
+                "requirements.txt",
+                "yarn.lock",
+            ],
+        )
+
+    def test_die_oekosystem_namen_sind_die_von_osv(self):
+        """Sie werden zusaetzlich gegen den echten Dienst geprueft --
+        `checks/oekosystemprobe.py`, in der Selbstpruefung."""
+        from checks import oekosystemprobe
+
+        aus_der_probe = {ecosystem for ecosystem, _, _ in oekosystemprobe.PROBEN}
+        aus_dem_bot = set()
+        for name, parser in PARSER.items():
+            if name == "requirements.txt":
+                text = "alpha==1.0\n"
+            elif name == "package-lock.json":
+                text = json.dumps({"packages": {"node_modules/a": {"version": "1.0"}}})
+            elif name == "go.mod":
+                text = "require example.com/a v1.0.0\n"
+            elif name in ("poetry.lock", "Cargo.lock"):
+                text = '[[package]]\nname = "a"\nversion = "1.0"\n'
+            elif name == "yarn.lock":
+                text = 'a@^1.0.0:\n  version "1.0.0"\n'
+            elif name == "pnpm-lock.yaml":
+                text = "packages:\n  /a@1.0.0:\n    resolution: {}\n"
+            else:
+                text = json.dumps({"packages": [{"name": "a/b", "version": "1.0"}]})
+            aus_dem_bot |= {d.ecosystem for d in parser(text, name)[0]}
+        self.assertEqual(aus_dem_bot, aus_der_probe)
+
+
 class SammelnTest(unittest.TestCase):
     def test_findet_die_sperrdatei(self):
         with tempfile.TemporaryDirectory() as ordner:
             fixtures.schreibe_requirements(ordner, ["django==2.2.0"])
             deps, _ = collect(ordner)
             self.assertEqual([(d.name, d.path) for d in deps], [("django", "requirements.txt")])
+
+    def test_findet_jede_art_von_sperrdatei(self):
+        inhalte = {
+            "requirements.txt": "alpha==1.0\n",
+            "poetry.lock": '[[package]]\nname = "b"\nversion = "1.0"\n',
+            "Cargo.lock": '[[package]]\nname = "c"\nversion = "1.0"\n',
+            "yarn.lock": 'd@^1.0.0:\n  version "1.0.0"\n',
+            "pnpm-lock.yaml": "packages:\n  /e@1.0.0:\n    resolution: {}\n",
+            "composer.lock": json.dumps({"packages": [{"name": "f/g", "version": "1.0"}]}),
+            "go.mod": "require example.com/h v1.0.0\n",
+        }
+        with tempfile.TemporaryDirectory() as ordner:
+            for name, inhalt in inhalte.items():
+                with open(os.path.join(ordner, name), "w", encoding="utf-8") as handle:
+                    handle.write(inhalt)
+            deps, _ = collect(ordner)
+        self.assertEqual(
+            sorted({d.path for d in deps}), sorted(inhalte), "eine Sperrdatei wurde uebersehen"
+        )
 
     def test_ueberspringt_node_modules(self):
         with tempfile.TemporaryDirectory() as ordner:

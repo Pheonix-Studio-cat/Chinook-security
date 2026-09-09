@@ -236,6 +236,27 @@ MUTATIONEN: tuple[Mutation, ...] = (
         neu='    gefangen = daten.get("gesamt", 0)',
         trifft="die Seite meldet alle Mutationen als gefangen, auch die entkommenen",
     ),
+    Mutation(
+        name="paketblock-nicht-erkannt",
+        datei="chinook/dependency_bot.py",
+        alt='        if roh.strip() == "[[package]]":',
+        neu="        if False:",
+        trifft="poetry.lock und Cargo.lock werden gar nicht mehr gelesen",
+    ),
+    Mutation(
+        name="npm-name-mit-version",
+        datei="chinook/dependency_bot.py",
+        alt="    return spec[:trenner]",
+        neu="    return spec",
+        trifft="yarn und pnpm fragen nach einem Paketnamen, den es nicht gibt",
+    ),
+    Mutation(
+        name="pnpm-liest-die-ganze-datei",
+        datei="chinook/dependency_bot.py",
+        alt="        if not im_paketteil:",
+        neu="        if False:",
+        trifft="pnpm-Einstellungen werden fuer Pakete gehalten",
+    ),
 )
 
 

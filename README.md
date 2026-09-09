@@ -156,7 +156,7 @@ reiner Diff-Scan durch.
 | Regel | Schwere | Was sie bedeutet |
 | --- | --- | --- |
 | `pull-request-target-checkout` | kritisch | `pull_request_target` läuft mit den Secrets des Ziel-Repos. Wer darin den PR-Kopf auscheckt, führt fremden Code mit diesen Secrets aus. |
-| `script-injection` | hoch | Ein Titel oder Kommentar wird vor der Ausführung in ein `run:`-Skript eingesetzt. Ein Backtick darin ist dann ein Befehl. |
+| `script-injection` | hoch | Ein Titel oder Kommentar wird vor der Ausführung in ein `run:`- oder `script:`-Skript eingesetzt. Ein Backtick darin ist dann ein Befehl. |
 | `permissions-write-all` | hoch | Jeder Schritt erbt alle Schreibrechte, auch eine Fremd-Action. |
 | `unpinned-action` | mittel (bei `actions/*`: Hinweis) | Ein Tag lässt sich verschieben. Dann ändert sich, was hier mit den Rechten dieses Repos läuft. |
 | `permissions-missing` | mittel | Ohne `permissions:` gelten die Standardrechte des Repos — an anderer Stelle eingestellt, änderbar, ohne dass diese Datei sich ändert. |
@@ -167,10 +167,23 @@ steht so auch in `docs/`, statt verschwiegen zu werden.
 
 ### Dependency-Bot
 
-Liest die **Sperrdateien**, nicht die Wunschlisten: `requirements.txt` (nur
-`==`), `package-lock.json` (Format 1 wie 2/3) und `go.mod`. Was er findet,
-fragt er bei **OSV.dev** an — der offenen Schwachstellendatenbank, ohne
-Schlüssel und ohne Anmeldung.
+Liest die **Sperrdateien**, nicht die Wunschlisten. Was er findet, fragt er bei
+**OSV.dev** an — der offenen Schwachstellendatenbank, ohne Schlüssel und ohne
+Anmeldung.
+
+| Datei | Ökosystem |
+| --- | --- |
+| `requirements.txt` (nur `==`), `poetry.lock` | PyPI |
+| `package-lock.json` (Format 1 wie 2/3), `yarn.lock` (v1 und Berry), `pnpm-lock.yaml` | npm |
+| `go.mod` | Go |
+| `Cargo.lock` | crates.io |
+| `composer.lock` | Packagist |
+
+Ein falsch geschriebener Ökosystem-Name fände **nichts** — und nichts sähe aus
+wie „sauber". Deshalb prüft `checks/oekosystemprobe.py` in der Selbstprüfung
+gegen den echten Dienst, ob OSV die Namen kennt. Sie arbeitet im Unterschied:
+erst fragt sie mit einem erfundenen Ökosystem; erst wenn OSV *das* zurückweist,
+ist „nicht zurückgewiesen" ein Beleg.
 
 Zwei Regeln: `known-vulnerability` (hoch) und `dependency-unpinned` (niedrig,
 nur bei `requirements.txt` ohne `==`).
@@ -348,16 +361,14 @@ Repo wird von GitHubs Push-Protection blockiert und von Scannern gemeldet.
 
 - **`v1` taggen**, damit Nutzer `@v1` schreiben können statt `@main` oder eines
   Commit-SHA.
-- **`actions/checkout` auf einen SHA festlegen.** Der Workflow-Bot meldet es an
-  den eigenen Workflows als Hinweis — der SHA fehlt, weil kein verifizierter
-  vorlag, und einen zu erfinden wäre eine erfundene Angabe in einem
-  Sicherheitswerkzeug.
 - **Der Aufseher ist nie gegen ein echtes Modell gelaufen.** Die Prüfungen
   fahren gegen einen Stub — richtig so, geprüft wird, was Chinook mit der
   Antwort macht. Ob ein echtes Modell brauchbare Einschätzungen liefert, ist
   offen.
-- **Mehr Ökosysteme** für den Dependency-Bot, **Lizenzen der Abhängigkeiten**
-  für den Lizenz-Bot.
+- **Lizenzen der Abhängigkeiten** für den Lizenz-Bot — er sieht bisher nur das
+  Repo selbst, nicht das, was es einbindet.
+- **Behobene Versionen im Befund.** Die OSV-Sammelabfrage liefert nur
+  Kennungen; eine behobene Version bräuchte einen zweiten Abruf je Advisory.
 
 ---
 

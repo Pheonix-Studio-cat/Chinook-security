@@ -15,7 +15,7 @@ jobs:
   pruefen:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # Die History-Pruefung braucht die ganze History, nicht nur den Kopf.
           fetch-depth: 0
@@ -34,10 +34,14 @@ jobs:
           fail-on: critical
           sarif: ""
 
+      # Seit die eigenen Actions auf Commits festgelegt sind, meldet der
+      # Workflow-Bot hier nichts mehr -- auch keinen Hinweis. Die Schwelle
+      # steht deshalb auf `info`: was wir bei anderen anmahnen, halten wir
+      # selbst, und ein Rueckfall faellt sofort auf.
       - name: Workflow-Bot auf das eigene Repo
         uses: ./actions/workflow-bot
         with:
-          fail-on: medium
+          fail-on: info
           sarif: ""
 
       - name: Code-Bot auf das eigene Repo
@@ -96,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Erreicht die OSV-Abfrage die echte Adresse?
         run: |
@@ -111,3 +115,8 @@ jobs:
             exit 1
           fi
           exit 0
+
+      # Schickt Chinook Oekosystem-Namen, die OSV kennt? Ein falsch
+      # geschriebener Name findet nichts -- und nichts sieht aus wie „sauber".
+      - name: Kennt OSV die Oekosystem-Namen?
+        run: python3 -m checks.oekosystemprobe
