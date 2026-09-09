@@ -58,10 +58,11 @@ jobs:
           fail-on: medium
           sarif: ""
 
-  # Beweist, dass der aufrufbare Workflow sich selbst findet: `job_workflow_sha`
-  # muss gesetzt sein, sonst bricht er ab. Genau der Punkt, an dem der erste
-  # Entwurf gescheitert waere -- und deshalb wird er gefahren, nicht behauptet.
-  aufrufbarer-workflow:
+  # Der aufrufbare Workflow, lokal aufgerufen. Hier ist `job_workflow_sha` leer
+  # -- nachgewiesen, nicht vermutet -- und der Workflow nimmt den Quelltext, der
+  # schon im Arbeitsverzeichnis liegt. Damit prueft dieser Job die Fassung
+  # **dieses** Pull Requests.
+  aufrufbarer-workflow-lokal:
     uses: ./.github/workflows/license-bot.yml
     with:
       fail-on: medium

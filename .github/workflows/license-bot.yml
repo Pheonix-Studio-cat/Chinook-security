@@ -38,36 +38,67 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Chinook wird in **genau der Fassung** geholt, die der Aufrufer mit @… gewaehlt
-      # hat. `job_workflow_sha` ist der Commit dieser Workflow-Datei; ohne ihn waere
-      # die Fassung nicht festgelegt, und der Schritt bricht lieber ab, als
-      # stillschweigend irgendetwas zu holen.
+      # Woher kommt Chinooks Quelltext?
+      #
+      # Beim Aufruf aus einem fremden Repo nennt `github.job_workflow_sha` den
+      # Commit **genau dieser Workflow-Datei** -- also die Fassung, die der
+      # Aufrufer mit @… gewaehlt hat. Sie wird nachgeladen.
+      #
+      # Beim Aufruf mit `uses: ./…` aus diesem Repo ist der Wert **leer**
+      # (nachgewiesen im Lauf zu PR #2). Dann braucht es kein Nachladen: ein
+      # lokaler Aufruf laeuft aus dem Commit des Aufrufers, und der liegt
+      # bereits im Arbeitsverzeichnis.
+      #
+      # Bleibt beides aus, bricht der Lauf ab. Ein leerer `ref` wuerde sonst
+      # stillschweigend den Standard-Branch holen: gruen, aber die falsche
+      # Fassung.
       - name: Fassung feststellen
         id: fassung
         env:
           SHA: ${{ github.job_workflow_sha }}
+          AUFRUFER: ${{ github.repository }}
+          EIGENER_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [ -z "$SHA" ]; then
-            echo "job_workflow_sha ist leer -- die Fassung von Chinook waere nicht" >&2
-            echo "festgelegt. Der Lauf bricht ab, statt eine beliebige zu holen." >&2
+          eigenes_repo="Pheonix-Studio-cat/Chinook-security"
+          if [ -n "$SHA" ]; then
+            echo "quelle=nachladen" >> "$GITHUB_OUTPUT"
+            echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+            echo "Chinook wird nachgeladen, Fassung $SHA."
+          elif [ "$AUFRUFER" = "$eigenes_repo" ]; then
+            echo "quelle=vorhanden" >> "$GITHUB_OUTPUT"
+            echo "Lokaler Aufruf: Chinook liegt bereits im Arbeitsverzeichnis ($EIGENER_SHA)."
+          else
+            echo "job_workflow_sha ist leer und der Aufrufer ist nicht dieses Repo." >&2
+            echo "Die Fassung von Chinook waere damit nicht festgelegt. Abbruch," >&2
+            echo "statt stillschweigend eine beliebige zu holen." >&2
             exit 1
           fi
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
-      - name: Chinook auschecken
+      - name: Chinook nachladen
+        if: steps.fassung.outputs.quelle == 'nachladen'
         uses: actions/checkout@v4
         with:
           repository: Pheonix-Studio-cat/Chinook-security
           ref: ${{ steps.fassung.outputs.sha }}
           path: .chinook
 
-      - name: Chinook Lizenz-Bot
+      - name: Chinook Lizenz-Bot (nachgeladen)
+        if: steps.fassung.outputs.quelle == 'nachladen'
         uses: ./.chinook/actions/license-bot
         with:
           path: ${{ inputs.path }}
           # `.chinook` ist unser eigener Quelltext im Arbeitsverzeichnis des
-          # Aufrufers -- der Bot soll das Repo pruefen, nicht sich selbst.
+          # Aufrufers -- der Bot soll sein Repo pruefen, nicht uns.
           exclude: ${{ inputs.exclude }},.chinook
+          fail-on: ${{ inputs.fail-on }}
+          sarif: ""
+
+      - name: Chinook Lizenz-Bot (lokal)
+        if: steps.fassung.outputs.quelle == 'vorhanden'
+        uses: ./actions/license-bot
+        with:
+          path: ${{ inputs.path }}
+          exclude: ${{ inputs.exclude }}
           fail-on: ${{ inputs.fail-on }}
           sarif: ""
