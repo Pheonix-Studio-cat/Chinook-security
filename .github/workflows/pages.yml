@@ -1,0 +1,54 @@
+# Baut die Website und veroeffentlicht sie auf GitHub Pages.
+#
+# Die Seite wird **erzeugt**, nicht gepflegt: jede Regel darauf kommt aus dem
+# Bot, der sie anwendet. Und sie zeigt den Stand der Gegenprobe -- deshalb wird
+# die hier zuerst gefahren. Ist sie rot, wird nichts veroeffentlicht: eine
+# Seite, die einen falschen Stand zeigt, ist schlimmer als keine.
+name: Website
+
+on:
+  push:
+    branches: [main]
+  # Woechentlich neu bauen, auch ohne Commit: der Stand der Gegenprobe auf der
+  # Seite soll aktuell sein, nicht vom letzten Merge stammen.
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gegenprobe
+        run: python3 -m checks.counterproof --json chinook-gegenprobe.json
+
+      - name: Seite bauen
+        run: python3 -m webseite.build --gegenprobe chinook-gegenprobe.json
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: webseite/out
+
+  veroeffentlichen:
+    needs: bauen
+    runs-on: ubuntu-latest
+    # Nur dieser Job bekommt die Rechte, die das Veroeffentlichen braucht --
+    # nicht der ganze Workflow.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -26,6 +26,13 @@ python3 -m chinook.cli overseer --report chinook-secret-bot.json    # braucht CH
 Alle fünf laufen **ohne Ausnahmeliste** über das eigene Repo. Wer eine
 Ausnahme braucht, hat meistens ein Fixture an der falschen Stelle.
 
+Die Seite bauen:
+
+```
+python3 -m checks.counterproof --json chinook-gegenprobe.json
+python3 -m webseite.build --gegenprobe chinook-gegenprobe.json   # -> webseite/out/index.html
+```
+
 Dasselbe läuft in `.github/workflows/selfcheck.yml` bei jedem Pull Request.
 
 ## Grenzen, die bleiben
@@ -56,8 +63,10 @@ Dasselbe läuft in `.github/workflows/selfcheck.yml` bei jedem Pull Request.
 
 ## Ein neuer Bot
 
-1. `chinook/<name>_bot.py` mit `run(root, excludes) -> list[Finding]`.
-2. In `chinook/cli.py` unter `BOTS` eintragen.
+1. `chinook/<name>_bot.py` mit `run(root, excludes) -> list[Finding]` **und**
+   `regeln() -> list[dict]` — daraus baut die Website ihre Tabelle.
+2. In `chinook/cli.py` unter `BOTS` und in `webseite/build.py` unter `BOTS`
+   eintragen.
 3. `actions/<name>-bot/action.yml` nach dem Muster der beiden vorhandenen —
    Eingaben gehen über `env`, nie als `${{ }}` in den Skripttext.
 4. Fixtures, Prüfungen, Mutationen.

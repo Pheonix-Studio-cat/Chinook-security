@@ -1,0 +1,61 @@
+# Der Wochenlauf. Er faengt, was sich aendert, ohne dass jemand etwas committet:
+# ein neues Advisory zu einer Abhaengigkeit, eine geaenderte Voreinstellung bei
+# GitHub Actions, ein Werkzeug, das anders antwortet als letzte Woche.
+#
+# Die Selbstpruefung laeuft bei jedem Pull Request. Dieser Lauf braucht keinen.
+name: Wochenlauf
+
+on:
+  schedule:
+    - cron: "43 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  aufseher:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pruefungen
+        run: python3 -m unittest discover -s checks -t . -q
+
+      - name: Gegenprobe
+        run: python3 -m checks.counterproof --json chinook-gegenprobe.json
+
+      - name: Secret-Bot
+        uses: ./actions/secret-bot
+        with:
+          history: "true"
+          fail-on: critical
+          sarif: ""
+
+      - name: Workflow-Bot
+        uses: ./actions/workflow-bot
+        with:
+          fail-on: medium
+          sarif: ""
+
+      - name: Code-Bot
+        uses: ./actions/code-bot
+        with:
+          fail-on: medium
+          sarif: ""
+
+      - name: Lizenz-Bot
+        uses: ./actions/license-bot
+        with:
+          fail-on: medium
+          sarif: ""
+
+      # Der einzige Schritt, der ueber die Woche etwas Neues erfahren kann:
+      # OSV kennt heute Advisories, die es letzte Woche nicht kannte.
+      - name: Dependency-Bot
+        uses: ./actions/dependency-bot
+        with:
+          fail-on: medium
+          sarif: ""

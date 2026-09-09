@@ -280,3 +280,30 @@ def run(root: str, excludes=(), url: str = OSV_URL, timeout: int = TIMEOUT) -> l
     if not deps:
         return lose
     return to_findings(deps, query_osv(deps, url=url, timeout=timeout)) + lose
+
+
+REGELN = (
+    {
+        "name": "known-vulnerability",
+        "titel": "Abhaengigkeit mit bekannter Schwachstelle",
+        "schwere": "high",
+        "was": (
+            "Laut OSV.dev betrifft mindestens ein Advisory diese Version. "
+            "Chinook stuft nicht selbst ein -- jede bekannte Schwachstelle ist "
+            "\u201ehoch\u201c, das Einordnen ist Sache des Aufsehers."
+        ),
+    },
+    {
+        "name": "dependency-unpinned",
+        "titel": "Abhaengigkeit ist nicht auf eine Version festgelegt",
+        "schwere": "low",
+        "was": (
+            "Ohne `==` installiert jeder Lauf moeglicherweise etwas anderes, "
+            "und die Pruefung sagt nichts ueber das aus, was installiert wird."
+        ),
+    },
+)
+
+
+def regeln() -> list[dict]:
+    return [dict(regel) for regel in REGELN]
