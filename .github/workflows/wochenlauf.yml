@@ -53,7 +53,7 @@ jobs:
           sarif: ""
 
       # Haengt an einem fremden Dienst und darf deshalb fehlschlagen, ohne den
-      # Lauf zu kippen -- Auskunft ueber OSV, nicht ueber Chinook.
+      # Lauf zu kippen -- Auskunft ueber OSV, nicht ueber Chinook Security.
       - name: Kennt OSV die Oekosystem-Namen?
         continue-on-error: true
         run: python3 -m checks.oekosystemprobe

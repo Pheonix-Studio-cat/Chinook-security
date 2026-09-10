@@ -190,7 +190,7 @@ class ModellStub:
 
     Der Aufseher wird nie gegen die echte Adresse gefahren: das kostet Geld,
     haengt am Netz und liefert bei jedem Lauf etwas anderes. Was hier geprueft
-    wird, ist nicht das Modell, sondern **was Chinook mit dessen Antwort
+    wird, ist nicht das Modell, sondern **was Chinook Security mit dessen Antwort
     macht** -- und das muss auch bei einer boesartigen Antwort stimmen.
     """
 
@@ -220,7 +220,7 @@ class ModellStub:
                     nutzlast = koerper
                 else:
                     inhalt = text if text is not None else _json.dumps(
-                        {"bewertungen": bewertungen or []}, ensure_ascii=False
+                        {"ratings": bewertungen or []}, ensure_ascii=False
                     )
                     nutzlast = _json.dumps(
                         {
@@ -256,7 +256,7 @@ class ModellStub:
 
 
 def schreibe_bericht(pfad: str, befunde) -> str:
-    """Ein Befundbericht im Chinook-Format, wie ihn ein Bot schreibt."""
+    """Ein Befundbericht im Chinook-Security-Format, wie ihn ein Bot schreibt."""
     with open(pfad, "w", encoding="utf-8") as handle:
         _json.dump(
             {

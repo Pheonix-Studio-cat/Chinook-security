@@ -135,20 +135,20 @@ def scan_workflow(text: str, path: str) -> list[Finding]:
                         Finding(
                             bot=BOT,
                             rule="unpinned-action",
-                            title="Action nicht auf einen Commit festgelegt",
+                            title="Action not pinned to a commit",
                             severity="info" if first_party else "medium",
                             confidence="high",
                             path=path,
                             line=number,
                             explanation=(
-                                f"`{reference}` zeigt auf "
-                                + (f"den beweglichen Ref `{ref}`" if ref else "keinen Ref")
-                                + ". Wer den Tag verschiebt, aendert damit, was in diesem "
-                                "Repo mit dessen Rechten ausgefuehrt wird."
+                                f"`{reference}` points at "
+                                + (f"the movable ref `{ref}`" if ref else "no ref")
+                                + ". Whoever moves that tag changes what runs in this "
+                                "repository with its permissions."
                             ),
                             remediation=(
-                                "Auf den vollen 40-stelligen Commit-SHA festlegen und den "
-                                "lesbaren Tag als Kommentar dahinterschreiben."
+                                "Pin the full 40-character commit SHA and put the readable "
+                                "tag behind it as a comment."
                             ),
                         )
                     )
@@ -158,19 +158,19 @@ def scan_workflow(text: str, path: str) -> list[Finding]:
                 Finding(
                     bot=BOT,
                     rule="permissions-write-all",
-                    title="Workflow laeuft mit allen Schreibrechten",
+                    title="Workflow runs with every write permission",
                     severity="high",
                     confidence="high",
                     path=path,
                     line=number,
                     explanation=(
-                        "`permissions: write-all` gibt dem GITHUB_TOKEN Schreibrechte auf "
-                        "alles -- Inhalte, Pakete, Deployments. Jeder Schritt im Workflow "
-                        "erbt sie, auch eine Fremd-Action."
+                        "`permissions: write-all` gives GITHUB_TOKEN write access to "
+                        "everything -- contents, packages, deployments. Every step in the "
+                        "workflow inherits it, a third-party action included."
                     ),
                     remediation=(
-                        "Auf `permissions: contents: read` setzen und einzelne Rechte nur "
-                        "dort erweitern, wo ein Schritt sie tatsaechlich braucht."
+                        "Set `permissions: contents: read` and widen single permissions "
+                        "only where a step actually needs them."
                     ),
                 )
             )
@@ -180,21 +180,20 @@ def scan_workflow(text: str, path: str) -> list[Finding]:
                 Finding(
                     bot=BOT,
                     rule="pull-request-target-checkout",
-                    title="pull_request_target checkt fremden Code aus",
+                    title="pull_request_target checks out foreign code",
                     severity="critical",
                     confidence="high",
                     path=path,
                     line=number,
                     explanation=(
-                        "`pull_request_target` laeuft mit den Secrets des Ziel-Repos. Wird "
-                        "darin der Kopf des Pull Requests ausgecheckt, fuehrt der Workflow "
-                        "fremden Code mit diesen Secrets aus -- jeder, der einen PR oeffnen "
-                        "kann, uebernimmt damit den Lauf."
+                        "`pull_request_target` runs with the target repository's secrets. "
+                        "Checking out the pull request head inside it runs foreign code "
+                        "with those secrets -- anyone who can open a PR takes over the run."
                     ),
                     remediation=(
-                        "Entweder `pull_request` verwenden (kein Zugriff auf Secrets) oder "
-                        "unter `pull_request_target` ausschliesslich den Basis-Stand "
-                        "auschecken und den PR-Inhalt nur als Daten behandeln."
+                        "Either use `pull_request` (no access to secrets), or under "
+                        "`pull_request_target` check out the base only and treat the PR "
+                        "content as data."
                     ),
                 )
             )
@@ -207,22 +206,21 @@ def scan_workflow(text: str, path: str) -> list[Finding]:
                         Finding(
                             bot=BOT,
                             rule="script-injection",
-                            title="Fremder Text wird in ein Skript eingesetzt",
+                            title="Foreign text is substituted into a script",
                             severity="high",
                             confidence="high",
                             path=path,
                             line=number,
                             explanation=(
-                                f"`{context}` wird von dem geschrieben, der den PR oder den "
-                                "Kommentar verfasst, und vor der Ausfuehrung direkt in das "
-                                "Skript eingesetzt -- in `run:` in die Shell, in `script:` "
-                                "in JavaScript. Ein Backtick oder ein Semikolon darin ist "
-                                "dann ein Befehl."
+                                f"`{context}` is written by whoever wrote the pull request "
+                                "or the comment, and is substituted into the script before "
+                                "execution -- into the shell in `run:`, into JavaScript in "
+                                "`script:`. A backtick or a semicolon in it is a command."
                             ),
                             remediation=(
-                                "Den Wert ueber `env:` an den Schritt geben und im Skript "
-                                "als Variable in Anfuehrungszeichen benutzen. Dann ist er "
-                                "Daten, nicht Quelltext."
+                                "Pass the value to the step through `env:` and use it in "
+                                "the script as a quoted variable. Then it is data, not "
+                                "source."
                             ),
                         )
                     )
@@ -232,19 +230,19 @@ def scan_workflow(text: str, path: str) -> list[Finding]:
             Finding(
                 bot=BOT,
                 rule="permissions-missing",
-                title="Workflow legt seine Rechte nicht fest",
+                title="Workflow does not set its permissions",
                 severity="medium",
                 confidence="high",
                 path=path,
                 line=1,
                 explanation=(
-                    "Ohne `permissions:` auf oberster Ebene gelten die Standardrechte des "
-                    "Repos. Die koennen weit sein, sind an einer anderen Stelle "
-                    "eingestellt und aendern sich, ohne dass diese Datei sich aendert."
+                    "Without a top-level `permissions:` the repository defaults apply. "
+                    "They can be wide, they are configured somewhere else, and they change "
+                    "without this file changing."
                 ),
                 remediation=(
-                    "`permissions: contents: read` auf oberster Ebene setzen und je Job "
-                    "nur das erweitern, was gebraucht wird."
+                    "Set `permissions: contents: read` at the top level and widen only "
+                    "what a job needs."
                 ),
             )
         )
@@ -274,46 +272,44 @@ def run(root: str, excludes=()) -> list[Finding]:
 REGELN = (
     {
         "name": "pull-request-target-checkout",
-        "titel": "pull_request_target checkt fremden Code aus",
+        "titel": "pull_request_target checks out foreign code",
         "schwere": "critical",
         "was": (
-            "Der Workflow laeuft mit den Secrets des Ziel-Repos und fuehrt darin "
-            "fremden Code aus. Wer einen PR oeffnen kann, uebernimmt den Lauf."
+            "The workflow runs with the target repository's secrets and runs foreign "
+            "code inside it. Anyone who can open a pull request takes over the run."
         ),
     },
     {
         "name": "script-injection",
-        "titel": "Fremder Text wird in ein Skript eingesetzt",
+        "titel": "Foreign text is substituted into a script",
         "schwere": "high",
         "was": (
-            "Ein Titel oder Kommentar wird vor der Ausfuehrung in einen "
-            "`run:`- oder `script:`-Block eingesetzt. Ein Backtick darin ist "
-            "dann ein Befehl."
+            "A title or comment is substituted into a `run:` or `script:` block "
+            "before execution. A backtick in it is then a command."
         ),
     },
     {
         "name": "permissions-write-all",
-        "titel": "Workflow laeuft mit allen Schreibrechten",
+        "titel": "Workflow runs with every write permission",
         "schwere": "high",
-        "was": "Jeder Schritt erbt sie, auch eine Fremd-Action.",
+        "was": "Every step inherits it, a third-party action included.",
     },
     {
         "name": "unpinned-action",
-        "titel": "Action nicht auf einen Commit festgelegt",
+        "titel": "Action not pinned to a commit",
         "schwere": "medium",
         "was": (
-            "Ein Tag laesst sich verschieben. Dann aendert sich, was mit den "
-            "Rechten dieses Repos laeuft. Bei `actions/*` nur ein Hinweis."
+            "A tag can be moved. Then what runs with this repository's permissions "
+            "changes. For `actions/*` this is only an informational note."
         ),
     },
     {
         "name": "permissions-missing",
-        "titel": "Workflow legt seine Rechte nicht fest",
+        "titel": "Workflow does not set its permissions",
         "schwere": "medium",
         "was": (
-            "Ohne `permissions:` gelten die Standardrechte des Repos -- an "
-            "anderer Stelle eingestellt und aenderbar, ohne dass die Datei sich "
-            "aendert."
+            "Without `permissions:` the repository defaults apply -- configured "
+            "elsewhere and changeable without this file changing."
         ),
     },
 )

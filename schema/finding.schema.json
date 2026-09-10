@@ -1,16 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Pheonix-Studio-cat/Chinook-security/schema/finding.schema.json",
-  "title": "Chinook-Befundbericht",
-  "description": "Das gemeinsame Format aller Chinook-Bots. Ein Befund traegt nie den gefundenen Wert.",
+  "title": "Chinook Security finding report",
+  "description": "The shared format of all Chinook Security bots. A finding never carries the value that was found.",
   "type": "object",
   "required": ["schema_version", "bot", "generated_at", "summary", "findings"],
   "additionalProperties": false,
   "properties": {
     "schema_version": { "const": "1" },
-    "bot": { "type": "string", "description": "Name des Bots, z. B. secret-bot" },
+    "bot": { "type": "string", "description": "name of the bot, e.g. secret-bot" },
     "generated_at": { "type": "string", "description": "UTC, ISO 8601" },
-    "target": { "type": "object", "description": "Was geprueft wurde" },
+    "target": { "type": "object", "description": "what was checked" },
     "summary": {
       "type": "object",
       "required": ["total", "by_severity"],
@@ -47,15 +47,15 @@
               "line": { "type": "integer", "minimum": 1 }
             }
           },
-          "explanation": { "type": "string", "description": "Warum das ein Problem ist" },
-          "remediation": { "type": "string", "description": "Was dagegen hilft" },
+          "explanation": { "type": "string", "description": "why this is a problem" },
+          "remediation": { "type": "string", "description": "what fixes it" },
           "evidence": {
             "type": "string",
-            "description": "Beschreibt den Fund, gibt ihn nie wieder. Regelname und Laenge, sonst nichts."
+            "description": "describes the find, never reproduces it -- rule name and length, nothing else"
           },
           "fingerprint": {
             "type": "string",
-            "description": "sha256 ueber bot, rule, path und line -- bewusst ohne den Fund."
+            "description": "sha256 over bot, rule, path and line -- deliberately without the find"
           }
         }
       }

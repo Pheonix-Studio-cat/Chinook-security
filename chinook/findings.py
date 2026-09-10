@@ -1,4 +1,4 @@
-"""Das gemeinsame Befund-Format des Chinook-Oekosystems.
+"""Das gemeinsame Befund-Format des Chinook-Security-Oekosystems.
 
 Jeder Bot gibt dasselbe aus. Ohne dieses Format waere weder die
 Aufseher-Schicht noch die Website baubar: beide lesen Befunde, nicht
@@ -43,7 +43,7 @@ def redact(raw: str, kind: str = "Treffer") -> str:
     genug, um zwei Funde zu unterscheiden, zu wenig, um einen zu benutzen.
     """
     text = "" if raw is None else str(raw)
-    return f"{kind}, {len(text)} Zeichen (Wert wird nicht ausgegeben)"
+    return f"{kind}, {len(text)} characters (value not shown)"
 
 
 def severity_rank(severity: str) -> int:

@@ -1,4 +1,4 @@
-"""Baut die Chinook-Website -- eine einzige statische HTML-Datei.
+"""Baut die Chinook-Security-Website -- eine einzige statische HTML-Datei.
 
 **Die Seite wird erzeugt, nicht gepflegt.** Jede Regel, die hier steht, kommt
 aus dem Bot, der sie anwendet (`regeln()`). Eine von Hand gepflegte Liste
@@ -36,43 +36,42 @@ REPO = "https://github.com/Pheonix-Studio-cat/Chinook-security"
 BOTS = (
     (
         secret_bot,
-        "Secret-Bot",
-        "Geheimnisse im Arbeitsbaum und in der Git-History. Ein Befund traegt nie "
-        "den gefundenen Wert -- nur Regel, Ort und Laenge.",
+        "Secret bot",
+        "Working tree <em>and</em> git history. A secret in an old commit is not gone "
+        "just because the current file is clean.",
     ),
     (
         workflow_bot,
-        "Workflow-Bot",
-        "Die GitHub Actions selbst. Zeilenbasiert, ohne YAML-Parser -- der Preis "
-        "der Abhaengigkeitsfreiheit, benannt statt verschwiegen.",
+        "Workflow bot",
+        "The GitHub Actions themselves &mdash; the route by which somebody reaches a "
+        "repository&rsquo;s secrets.",
     ),
     (
         dependency_bot,
-        "Dependency-Bot",
-        "Sperrdateien gegen OSV.dev. Kommt die Abfrage nicht durch, endet der Lauf "
-        "mit 2: „der Lauf beweist nichts“, nicht „sauber“.",
+        "Dependency bot",
+        "Eight lockfile formats against OSV.dev. If the query does not get through, the "
+        "run ends with <b>2</b>: &bdquo;proves nothing&ldquo;, not &bdquo;clean&ldquo;.",
     ),
     (
         code_bot,
-        "Code-Bot",
-        "Muster im Quelltext. Musterbasiert ohne Datenflussanalyse: er sieht, "
-        "<em>dass</em> eine gefaehrliche Stelle da ist, nicht <em>ob</em> an ihr "
-        "etwas Fremdes ankommt.",
+        "Code bot",
+        "Patterns in the source. It sees <em>that</em> a dangerous spot is there &mdash; "
+        "not <em>whether</em> anything foreign arrives at it.",
     ),
     (
         license_bot,
-        "Lizenz-Bot",
-        "Was an Lizenzangaben fehlt und was auseinandergeht. Er stellt nie fest, "
-        "unter welcher Lizenz etwas steht -- das ist eine Frage an einen Menschen.",
+        "Licence bot",
+        "What is missing and what disagrees. It never states which licence something is "
+        "under.",
     ),
 )
 
 SCHWERE_TEXT = {
-    "critical": "kritisch",
-    "high": "hoch",
-    "medium": "mittel",
-    "low": "niedrig",
-    "info": "Hinweis",
+    "critical": "critical",
+    "high": "high",
+    "medium": "medium",
+    "low": "low",
+    "info": "info",
 }
 
 STIL = """
@@ -182,8 +181,8 @@ def lies_gegenprobe(pfad: str | None) -> dict | None:
 
 
 def regeltabelle(regeln, mit_sprache: bool = False) -> str:
-    kopf = "<tr><th>Regel</th>" + ("<th>Sprache</th>" if mit_sprache else "") + (
-        "<th>Schwere</th><th>Was sie bedeutet</th></tr>"
+    kopf = "<tr><th>Rule</th>" + ("<th>Language</th>" if mit_sprache else "") + (
+        "<th>Severity</th><th>What it means</th></tr>"
     )
     zeilen = []
     for regel in regeln:
@@ -207,40 +206,41 @@ def regeltabelle(regeln, mit_sprache: bool = False) -> str:
 def abschnitt_gegenprobe(daten: dict | None) -> str:
     if daten is None:
         return (
-            "<p><strong>Fuer diese Fassung liegt kein Ergebnis vor.</strong> "
-            "Die Seite behauptet deshalb nichts ueber den Stand der Gegenprobe. "
-            "Sie wird bei jedem Pull Request gefahren; das Ergebnis erscheint "
-            "hier, sobald es mitgeliefert wird.</p>"
+            "<p><strong>No result is available for this version.</strong> "
+            "The page therefore claims nothing about the state of the counterproof. "
+            "It runs on every pull request; the result appears here as soon as it is "
+            "handed along.</p>"
         )
     gesamt = daten.get("gesamt", 0)
     gefangen = daten.get("gefangen", 0)
     grundlauf = daten.get("grundlauf", "unbekannt")
+    zustand = {"gruen": "green", "rot": "red"}.get(grundlauf, grundlauf)
     kopfzeile = (
-        f"<p><strong>{gefangen} von {gesamt} Mutationen gefangen.</strong> "
-        f"Grundlauf: {e(grundlauf)}.</p>"
+        f"<p><strong>{gefangen} of {gesamt} mutations caught.</strong> "
+        f"Baseline run: {e(zustand)}.</p>"
     )
     if grundlauf != "gruen":
         kopfzeile += (
-            "<p>Der Grundlauf war nicht gruen -- die Gegenprobe sagt in diesem "
-            "Fall <em>nichts</em> aus.</p>"
+            "<p>The baseline run was not green &mdash; in that case the counterproof "
+            "says <em>nothing</em>.</p>"
         )
     zeilen = []
     for mutation in daten.get("mutationen", []):
-        zustand = (
-            '<span class="gefangen">gefangen</span>'
+        zustand_m = (
+            '<span class="gefangen">caught</span>'
             if mutation.get("gefangen")
-            else '<span class="entkommen">ENTKOMMEN</span>'
+            else '<span class="entkommen">ESCAPED</span>'
         )
         zeilen.append(
             "<tr>"
             f"<td><code>{e(mutation.get('name', ''))}</code></td>"
-            f"<td>{zustand}</td>"
+            f"<td>{zustand_m}</td>"
             f"<td>{e(mutation.get('trifft', ''))}</td>"
             "</tr>"
         )
     tabelle = (
         '<div class="tabellenhuelle"><table>'
-        "<tr><th>Mutation</th><th>Ergebnis</th><th>Was sie kaputt macht</th></tr>"
+        "<tr><th>Mutation</th><th>Result</th><th>What it breaks</th></tr>"
         + "".join(zeilen)
         + "</table></div>"
         if zeilen
@@ -254,11 +254,11 @@ def baue(gegenprobe: dict | None = None) -> str:
     mutationen = gegenprobe.get("gesamt") if gegenprobe else None
 
     kacheln = [
-        ("5", "Bots"),
-        (str(regelzahl), "Regeln"),
-        (str(zaehle_pruefungen()), "Pruefungen"),
-        (str(mutationen) if mutationen else "–", "Mutationen"),
-        ("0", "Abhaengigkeiten"),
+        ("5", "bots"),
+        (str(regelzahl), "rules"),
+        (str(zaehle_pruefungen()), "checks"),
+        (str(mutationen) if mutationen else "\u2013", "mutations"),
+        ("0", "dependencies"),
     ]
     kachel_html = "".join(
         f'<div class="kachel"><span class="zahl">{e(z)}</span>'
@@ -279,48 +279,48 @@ def baue(gegenprobe: dict | None = None) -> str:
     felder = list(schema["properties"]["findings"]["items"]["properties"])
 
     return f"""<!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chinook &mdash; Sicherheits-Bots als GitHub Actions</title>
-<meta name="description" content="Open-Source-Sicherheits-Bots als GitHub Actions, mit einer KI-Schicht, die die Bots kontrolliert. Jede Pruefung ist gegengeprueft.">
+<title>Chinook Security &mdash; bots as GitHub Actions</title>
+<meta name="description" content="Open-source security bots as GitHub Actions, with an AI layer that keeps the bots honest. Every check is counter-proved.">
 <style>{STIL}</style>
 </head>
 <body>
 <div class="huelle">
 
 <header>
-<h1>Chinook
-<span class="unter">Sicherheits-Bots als GitHub Actions &mdash; und eine KI-Schicht,
-die die Bots kontrolliert. Open Source, MIT, Fassung {e(__version__)}.</span></h1>
+<h1>Chinook Security
+<span class="unter">Security bots as GitHub Actions &mdash; and an AI layer that keeps
+the bots honest. Open source, MIT, version {e(__version__)}.</span></h1>
 </header>
 
 <div class="karten">{kachel_html}</div>
 
 <div class="merksatz">
-<p>Ein Sicherheitswerkzeug, das gr&uuml;n l&auml;uft, ohne etwas zu pr&uuml;fen, ist schlimmer
-als keins: es erzeugt Vertrauen, das nichts tr&auml;gt.</p>
-<p>Deshalb ist in Chinook die <strong>Gegenprobe</strong> kein Zusatz, sondern der
-Kern &mdash; jede Regel wird gegen einen absichtlich kaputten Fall gefahren, und jede
-Pr&uuml;fung gegen einen absichtlich kaputten Bot.</p>
+<p>A security tool that runs green without checking anything is worse than none:
+it creates trust that carries nothing.</p>
+<p>That is why the <strong>counterproof</strong> is not an extra in Chinook Security but the
+core &mdash; every rule is run against a deliberately broken case, and every check
+against a deliberately broken bot.</p>
 </div>
 
-<h2>Einbauen</h2>
-<p>In das zu pr&uuml;fende Repo, als <code>.github/workflows/chinook.yml</code>:</p>
-<pre><code>name: Chinook
+<h2>Installing</h2>
+<p>Into the repository you want checked, as <code>.github/workflows/chinook.yml</code>:</p>
+<pre><code>name: Chinook Security
 on: [pull_request]
 
 permissions:
   contents: read
 
 jobs:
-  sicherheit:
+  security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # nur n&ouml;tig f&uuml;r die History-Pr&uuml;fung
+          fetch-depth: 0          # only needed for the history check
 
       - uses: Pheonix-Studio-cat/Chinook-security/actions/secret-bot@main
         with:
@@ -329,86 +329,82 @@ jobs:
       - uses: Pheonix-Studio-cat/Chinook-security/actions/dependency-bot@main
       - uses: Pheonix-Studio-cat/Chinook-security/actions/code-bot@main
       - uses: Pheonix-Studio-cat/Chinook-security/actions/license-bot@main</code></pre>
-<p><code>@main</code> ist zum Ausprobieren. F&uuml;r den Dauerbetrieb auf einen
-Commit-SHA festlegen &mdash; genau das, was der Workflow-Bot bei jeder anderen
-Action anmahnt.</p>
+<p><code>@main</code> is for trying it out. For day-to-day use, pin a commit SHA
+&mdash; exactly what the workflow bot demands of every other action.</p>
 
-<h3>R&uuml;ckgabewerte</h3>
+<h3>Exit codes</h3>
 <div class="tabellenhuelle"><table>
-<tr><th>Wert</th><th>Bedeutung</th></tr>
-<tr><td><code>0</code></td><td>nichts gefunden, das die Schwelle erreicht</td></tr>
-<tr><td><code>1</code></td><td>Befunde ab der Schwelle</td></tr>
-<tr><td><code>2</code></td><td><strong>der Lauf konnte nichts feststellen</strong> &mdash;
-z.&nbsp;B. OSV war nicht erreichbar</td></tr>
+<tr><th>Value</th><th>Meaning</th></tr>
+<tr><td><code>0</code></td><td>nothing found that reaches the threshold</td></tr>
+<tr><td><code>1</code></td><td>findings at or above the threshold</td></tr>
+<tr><td><code>2</code></td><td><strong>the run could not determine anything</strong> &mdash;
+e.g. OSV was unreachable</td></tr>
 </table></div>
-<p>Die <code>2</code> ist der Grund, warum es sie gibt: ein Abruf, der nicht
-durchkam, ist kein leeres Ergebnis. Er gilt nicht als bestanden.</p>
+<p>The <code>2</code> is the reason it exists: a request that did not get through
+is not an empty result. It does not count as passing.</p>
 
-<h2>Die Bots</h2>
+<h2>The bots</h2>
 {"".join(bot_html)}
 
-<h2>Der Aufseher</h2>
-<p>Die KI-Schicht. Sie ordnet jeden Befund ein &mdash; {einschaetzungen} &mdash;
-und liefert ein, zwei S&auml;tze Begr&uuml;ndung.</p>
+<h2>The overseer</h2>
+<p>The AI layer. It rates every finding &mdash; {einschaetzungen} &mdash; and gives a
+sentence or two of reasoning.</p>
 <div class="merksatz">
-<p><strong>Kein Befund geht verloren.</strong> Die Antwort des Modells kann nur ein
-Feld <code>triage</code> an einen Befund h&auml;ngen. Sie kann keinen entfernen,
-keinen Schweregrad &auml;ndern und keinen erfinden.</p>
-<p>Und das steht im Code, nicht im Prompt: die Ergebnisliste entsteht aus den
-<em>Befunden</em>, nie aus der Antwort. Eine Zusicherung, die an der Folgsamkeit
-eines Modells h&auml;ngt, ist keine.</p>
+<p><strong>No finding gets lost.</strong> The model&rsquo;s answer can only attach a
+<code>triage</code> field to a finding. It cannot remove one, change a severity, or
+invent one.</p>
+<p>And that is in the code, not in the prompt: the result list is built from the
+<em>findings</em>, never from the answer. A guarantee that hangs on a model&rsquo;s
+obedience is not one.</p>
 </div>
 <div class="tabellenhuelle"><table>
-<tr><th>Eigenschaft</th><th>Warum</th></tr>
-<tr><td>Er zahlt nicht auf ein fremdes Konto</td>
-<td>Der Schl&uuml;ssel kommt aus <code>CHINOOK_AI_TOKEN</code> im Repo dessen, der ihn
-einsetzt. Chinook h&auml;lt keinen.</td></tr>
-<tr><td>Er ist freiwillig</td>
-<td>Ohne Schl&uuml;ssel l&auml;uft alles andere weiter. Ein Scanner, der ausf&auml;llt, weil
-ein Modell nicht antwortet, ist schlechter als keiner.</td></tr>
-<tr><td>Keine Werkzeuge, keine Schreibrechte</td>
-<td>Er liest zwangsl&auml;ufig fremden Text. Ein Modell mit Werkzeugen, das solchen
-Text liest, ist Prompt Injection mit Schreibzugriff.</td></tr>
+<tr><th>Property</th><th>Why</th></tr>
+<tr><td>It does not spend someone else&rsquo;s money</td>
+<td>The key comes from <code>CHINOOK_AI_TOKEN</code> in the repository of whoever runs
+it. Chinook Security holds none.</td></tr>
+<tr><td>It is optional</td>
+<td>Without a key everything else keeps running. A scanner that fails because a model
+did not answer is worse than none.</td></tr>
+<tr><td>No tools, no write access</td>
+<td>It inevitably reads foreign text. A model with tools reading such text is prompt
+injection with write access.</td></tr>
 </table></div>
 
-<h2>Die Gegenprobe</h2>
-<p>Sie kopiert das Repo, macht die Bots <strong>absichtlich kaputt</strong> &mdash;
-Redaktion abgeschaltet, eine Regel &uuml;bersprungen, der Netzfehler verschluckt,
-der Aufseher l&auml;sst Befunde fallen &mdash; und verlangt, dass die Pr&uuml;fungen
-daraufhin <strong>rot</strong> werden. Bleiben sie gr&uuml;n, ist die Pr&uuml;fung
-wertlos, und die Gegenprobe sagt das laut.</p>
+<h2>The counterproof</h2>
+<p>It copies the repository, breaks the bots <strong>on purpose</strong> &mdash;
+redaction switched off, a rule skipped, the network error swallowed, the overseer
+dropping findings &mdash; and demands that the checks go <strong>red</strong> as a
+result. If they stay green, the check is worthless, and the counterproof says so.</p>
 {abschnitt_gegenprobe(gegenprobe)}
 
-<h2>Das Befund-Format</h2>
-<p>Alle Bots geben dasselbe aus &mdash; als JSON und als SARIF f&uuml;r GitHubs
-Security-Ansicht. Ohne das w&auml;ren weder der Aufseher noch diese Seite baubar,
-weil beide Befunde lesen und nicht Werkzeugausgaben.</p>
-<p>Felder je Befund: {", ".join(f"<code>{e(f)}</code>" for f in felder)}.</p>
-<p><code>evidence</code> beschreibt einen Fund, ohne ihn wiederzugeben &mdash; kein
-Pr&auml;fix, kein Hash, nur Regel und L&auml;nge. Ein Pr&auml;fix w&auml;re bei einem Passwort
-ein Leck, ein Hash bei einem schwachen Passwort ein Orakel, und das Action-Log
-eines &ouml;ffentlichen Repos liest jeder.</p>
+<h2>The finding format</h2>
+<p>Every bot emits the same thing &mdash; as JSON and as SARIF for GitHub&rsquo;s
+security view. Without it neither the overseer nor this page could be built, because
+both read findings and not tool output.</p>
+<p>Fields per finding: {", ".join(f"<code>{e(f)}</code>" for f in felder)}.</p>
+<p><code>evidence</code> describes a find without reproducing it &mdash; no prefix, no
+hash, only rule and length. A prefix would be a leak for a password, a hash an oracle
+for a weak one, and in a public repository anyone can read the action log.</p>
 
-<h2>Was Chinook nicht verspricht</h2>
+<h2>What Chinook Security does not promise</h2>
 <ul>
-<li><strong>Vollst&auml;ndigkeit.</strong> Kein Befund hei&szlig;t nicht &bdquo;sicher&ldquo;, sondern
-&bdquo;diese Regeln haben nichts gefunden&ldquo;.</li>
-<li><strong>Keine Falschmeldungen.</strong> Mehrere Regeln laufen mit mittlerer
-Zuversicht und liegen gelegentlich daneben.</li>
-<li><strong>Keine Erkennungsraten.</strong> Es gibt hier keine Prozentzahlen, weil es
-keine Messung gibt, die sie belegt.</li>
-<li><strong>Keine Rechtsauskunft</strong> und <strong>keine eigene Einstufung von
-Schwachstellen.</strong></li>
+<li><strong>Completeness.</strong> No finding does not mean &bdquo;secure&ldquo;, it
+means &bdquo;these rules found nothing&ldquo;.</li>
+<li><strong>No false positives.</strong> Several rules run at medium confidence and
+are sometimes wrong.</li>
+<li><strong>No detection rates.</strong> There are no percentages here, because there
+is no measurement backing them.</li>
+<li><strong>No legal advice</strong> and no severity rating of its own.</li>
 </ul>
-<p>Die Grenzen im Einzelnen stehen in
-<a href="{REPO}/blob/main/docs/grenzen.md"><code>docs/grenzen.md</code></a> &mdash;
-diese Datei ist wichtiger als eine Merkmalsliste.</p>
+<p>The limits in detail are in
+<a href="{REPO}/blob/main/docs/grenzen.md"><code>docs/grenzen.md</code></a> (German)
+&mdash; that file matters more than a feature list.</p>
 
 <footer>
-<p>Chinook &mdash; <a href="{REPO}">{REPO.replace("https://", "")}</a> &middot;
+<p>Chinook Security &mdash; <a href="{REPO}">{REPO.replace("https://", "")}</a> &middot;
 MIT &middot; PH&Ouml;NIX STUDIO.
-Diese Seite wird aus dem Quelltext erzeugt, nicht von Hand gepflegt: jede Regel
-oben kommt aus dem Bot, der sie anwendet.</p>
+This page is generated from the source, not maintained by hand: every rule above
+comes from the bot that applies it.</p>
 </footer>
 
 </div>
@@ -418,7 +414,7 @@ oben kommt aus dem Bot, der sie anwendet.</p>
 
 
 def main(argv=None) -> int:
-    zerleger = argparse.ArgumentParser(prog="webseite.build", description="Baut die Chinook-Website.")
+    zerleger = argparse.ArgumentParser(prog="webseite.build", description="Baut die Chinook-Security-Website.")
     zerleger.add_argument("--out", default=str(WURZEL / "webseite" / "out"), help="Ausgabeverzeichnis")
     zerleger.add_argument(
         "--gegenprobe", default="", help="JSON-Ergebnis von checks.counterproof"

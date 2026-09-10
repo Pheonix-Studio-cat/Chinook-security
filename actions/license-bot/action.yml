@@ -1,4 +1,4 @@
-name: "Chinook Lizenz-Bot"
+name: "Chinook Security Lizenz-Bot"
 description: >-
   Meldet, was an Lizenzangaben fehlt oder auseinandergeht. Er stellt nie fest, unter
   welcher Lizenz etwas steht -- das ist eine Frage an einen Menschen.

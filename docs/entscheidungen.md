@@ -5,6 +5,39 @@ neu verhandelt.
 
 ---
 
+## Englisch für alles, was nach aussen geht
+
+**Entschieden am 2026-09-10, vom Projektinhaber.** Vorher war alles deutsch —
+richtig, solange das Repo privat war, und falsch, seit es öffentlich ist.
+
+Die Trennlinie verläuft nicht zwischen „Code" und „Doku", sondern zwischen
+**wer es liest**:
+
+| englisch | deutsch |
+| --- | --- |
+| `README.md`, die Website | `docs/`, `SECURITY.md`, `CONTRIBUTING.md` |
+| Befundtexte, Kommandozeilen-Ausgabe, Berichte | Kommentare im Quelltext |
+| Feldnamen und Werte in JSON, Regel- und Mutationsnamen | Commit-Meldungen, PR-Texte |
+
+Was in ein fremdes Repo wandert oder in einem fremden Action-Log landet, ist
+englisch. Was nur der Projektinhaber und ich lesen, bleibt deutsch — dort ist
+Deutsch das Praktischere, und eine Übersetzung um ihrer selbst willen erzeugt
+nur Diff-Rauschen.
+
+**Wo die Regel bewusst endet:** die Namen interner Funktionen (`baue`,
+`verbinde`, `regeln`), die CSS-Variablen und Klassennamen der Website
+(`--kritisch`, `.gefangen`) und die Variablennamen in den Skripten bleiben
+deutsch. Sie sind weder Ausgabe noch Schnittstelle — sie umzubenennen wäre ein
+grosser Diff ohne einen einzigen Leser, dem es hilft.
+
+**Ein Bruch am Ausgabeformat gehört dazu.** Die Werte des Aufsehers heissen
+jetzt `confirmed`, `probably-real`, `probably-noise`, `unclear`; die Zustände
+`triaged`, `skipped`, `failed`; der Berichtsschlüssel `overseer` statt
+`aufseher`. Bei Fassung 0.1.0 und ohne fremde Nutzer ist das der richtige
+Zeitpunkt — später wäre es einer mit Zuschauern.
+
+---
+
 ## Keine Abhängigkeiten, nur Standardbibliothek
 
 Ein Sicherheitswerkzeug mit dreihundert transitiven Paketen ist selbst eine
@@ -34,7 +67,7 @@ gegengeprüft.
 ## Composite actions statt aufrufbarer Workflows — mit Beleg
 
 Ein aufrufbarer Workflow wäre für den Nutzer eine Zeile statt vier. Er scheitert
-an einer einfachen Frage: **welche Fassung von Chinook lädt er nach?**
+an einer einfachen Frage: **welche Fassung von Chinook Security lädt er nach?**
 
 `actions/checkout` holt in einem aufrufbaren Workflow das Repo des *Aufrufers*,
 nicht das eigene. Der Wert dafür wäre `github.job_workflow_sha` — der Commit
@@ -81,7 +114,7 @@ statt der `2` eine `0` zurück. Beide werden gefangen.
 
 ---
 
-## Chinook stuft Schwachstellen nicht selbst ein
+## Chinook Security stuft Schwachstellen nicht selbst ein
 
 Jede bekannte Schwachstelle ist `high`. Kein CVSS, keine eigene Zahl.
 
@@ -290,3 +323,39 @@ vollständiger Zustand ist, bis man es weiß.
 Zwei Prüfungen halten es: der Workflow-Bot läuft über die eigenen Workflows
 jetzt mit Schwelle `info` — also ohne jede Nachsicht —, und eine zweite geht
 jede `uses:`-Zeile durch und verlangt einen 40-stelligen SHA.
+
+---
+
+## Der Name ist „Chinook Security", der Bezeichner bleibt `chinook`
+
+Festgelegt am 2026-09-10 vom Projektinhaber. Das Projekt heisst **Chinook
+Security**. Vorher stand hier und überall „Chinook" — kürzer, und das Repo
+heisst ohnehin `Chinook-security`. Das ist kein Grund.
+
+Umbenannt wurde, was der Name als **Anzeige** ist: die Überschrift der README
+und ihr Fliesstext, Titel und Kopf der Website, die `name:`-Zeilen der sechs
+Actions — die stehen in der Actions-Oberfläche fremder Repos —, die
+Beschreibung der Kommandozeile, der Titel des JSON-Schemas, die Kommentare.
+
+**Die Bezeichner bleiben.** Sie sind Adressen, keine Namen:
+
+| Bezeichner | warum er bleibt |
+| --- | --- |
+| `chinook/`, `python -m chinook.cli` | Importpfad. Eine Umbenennung bricht jeden Aufruf in den sechs Actions. |
+| `prog="chinook"` | das Kommando, das man tippt |
+| `CHINOOK_AI_TOKEN` | Repo-Secret. Ein neuer Name zwingt jeden Nutzer, es neu anzulegen. |
+| `Pheonix-Studio-cat/Chinook-security` | die Repo-Adresse, auf die `uses:` in fremden Repos zeigt |
+
+Dieselbe Trennung wie bei „PostgreSQL" und `psql`, oder „Node.js" und `node`.
+Der Anzeigename darf sich ändern, ohne dass jemandes Aufruf bricht.
+
+Wer die Bezeichner mitziehen will, muss es ausdrücklich sagen: das ist ein
+Bruch für jeden, der die Bots schon eingebaut hat, und anders als der Bruch am
+Ausgabeformat lässt er sich nicht durch eine Zeile in der README auffangen.
+
+**Dabei gefunden:** die gesamte `--help`-Ausgabe war bei der
+Englisch-Umstellung deutsch geblieben, ebenso die Beschreibungstexte im
+JSON-Schema. Beides ist jetzt englisch. Die Lehre steht im Gedächtnis-Repo als
+Fehler Nr. 19: *wer die Ausgabe eines Werkzeugs übersetzt, ruft das Werkzeug
+danach auf.* Den Quelltext zu lesen genügt nicht — `help="..."` sieht nicht wie
+Prosa aus.

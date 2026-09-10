@@ -1,4 +1,4 @@
-# Chinook prueft sich selbst. Ein Sicherheitswerkzeug, das die eigenen Regeln
+# Chinook Security prueft sich selbst. Ein Sicherheitswerkzeug, das die eigenen Regeln
 # nicht einhaelt, ist kein Argument.
 name: Selbstpruefung
 
@@ -63,9 +63,9 @@ jobs:
           sarif: ""
 
       # Der Aufseher laeuft hier **ohne** Schluessel. Das ist kein Mangel, das
-      # ist der Punkt: Chinook haelt keinen, und der freiwillige Pfad muss
+      # ist der Punkt: Chinook Security haelt keinen, und der freiwillige Pfad muss
       # gefahren werden, nicht behauptet. Der Schritt muss gruen sein und
-      # "uebersprungen" melden.
+      # `skipped` melden.
       - name: Einen Bericht fuer den Aufseher erzeugen
         uses: ./actions/workflow-bot
         with:
@@ -73,19 +73,19 @@ jobs:
           report: chinook-workflow-bot.json
           sarif: ""
 
-      - name: Aufseher ohne Schluessel -- muss uebersprungen werden
+      - name: Aufseher ohne Schluessel -- muss "skipped" melden
         id: aufseher
         uses: ./actions/overseer
         with:
           reports: chinook-workflow-bot.json
 
-      - name: Der freiwillige Pfad muss uebersprungen heissen
+      - name: Der freiwillige Pfad muss "skipped" heissen
         env:
           STAND: ${{ steps.aufseher.outputs.status }}
         run: |
           set -euo pipefail
-          if [ "$STAND" != "uebersprungen" ]; then
-            echo "Der Aufseher meldet '$STAND' statt 'uebersprungen'." >&2
+          if [ "$STAND" != "skipped" ]; then
+            echo "Der Aufseher meldet '$STAND' statt 'skipped'." >&2
             echo "Ohne Schluessel darf er nichts einordnen -- und trotzdem nicht scheitern." >&2
             exit 1
           fi
@@ -94,7 +94,7 @@ jobs:
 
   # Der einzige Schritt, der an einem fremden Dienst haengt. Er darf fehlschlagen,
   # ohne den Lauf zu kippen: er ist **Auskunft** darueber, ob OSV gerade
-  # antwortet, keine Zusicherung ueber Chinook. Die Bot-Logik selbst wird in
+  # antwortet, keine Zusicherung ueber Chinook Security. Die Bot-Logik selbst wird in
   # `checks/test_dependency_bot.py` gegen einen eigenen Stub gefahren.
   netzprobe:
     runs-on: ubuntu-latest
@@ -111,12 +111,12 @@ jobs:
           status=$?
           rm -rf "$arbeitsordner"
           if [ "$status" -eq 2 ]; then
-            echo "OSV war nicht erreichbar. Das sagt nichts ueber Chinook aus." >&2
+            echo "OSV war nicht erreichbar. Das sagt nichts ueber Chinook Security aus." >&2
             exit 1
           fi
           exit 0
 
-      # Schickt Chinook Oekosystem-Namen, die OSV kennt? Ein falsch
+      # Schickt Chinook Security Oekosystem-Namen, die OSV kennt? Ein falsch
       # geschriebener Name findet nichts -- und nichts sieht aus wie „sauber".
       - name: Kennt OSV die Oekosystem-Namen?
         run: python3 -m checks.oekosystemprobe

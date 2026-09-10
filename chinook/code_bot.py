@@ -39,170 +39,170 @@ class Rule:
 RULES: tuple[Rule, ...] = (
     Rule(
         name="python-eval-exec",
-        title="Text wird im Python-Quelltext als Programm ausgefuehrt",
+        title="Text is executed as a program in Python",
         pattern=re.compile(r"(?<![\w.])(?:eval|exec)\s*\("),
         suffixes=PYTHON,
         severity="high",
         confidence="medium",
         explanation=(
-            "`eval` und `exec` fuehren Text als Programm aus. Kommt der Text aus einer "
-            "Anfrage, einer Datei oder einer Umgebungsvariablen, fuehrt der Aufrufer aus, "
-            "was er will."
+            "`eval` and `exec` run text as a program. If the text comes from a "
+            "request, a file or an environment variable, the caller runs whatever "
+            "they like."
         ),
         remediation=(
-            "Fuer Daten `json.loads` oder `ast.literal_eval` verwenden. Fuer Verzweigungen "
-            "eine Zuordnungstabelle statt erzeugten Quelltext."
+            "Use `json.loads` or `ast.literal_eval` for data. For branching, use a "
+            "lookup table instead of generated source."
         ),
     ),
     Rule(
         name="python-subprocess-shell",
-        title="subprocess laesst die Shell den Befehl zusammensetzen",
+        title="subprocess lets the shell assemble the command",
         pattern=re.compile(r"shell\s*=\s*True"),
         suffixes=PYTHON,
         severity="high",
         confidence="medium",
         explanation=(
-            "Steht der Schalter `shell` auf wahr, geht der Befehl durch die Shell. Ein "
-            "Semikolon oder ein "
-            "Backtick in einem eingesetzten Wert ist dann ein eigener Befehl."
+            "With the `shell` switch on, the command goes through the shell. A "
+            "semicolon or a backtick in a substituted value is then a command of "
+            "its own."
         ),
         remediation=(
-            "Den Befehl als Liste uebergeben (`['git', 'log', pfad]`) und den "
-            "Shell-Schalter weglassen. Dann ist der Wert ein Argument, kein Quelltext."
+            "Pass the command as a list (`['git', 'log', path]`) and leave the "
+            "shell switch out. Then the value is an argument, not source."
         ),
     ),
     Rule(
         name="python-pickle-load",
-        title="pickle laedt fremde Daten",
+        title="pickle loads foreign data",
         pattern=re.compile(r"(?<![\w.])pickle\.loads?\s*\("),
         suffixes=PYTHON,
         severity="high",
         confidence="medium",
         explanation=(
-            "`pickle` fuehrt beim Laden Quelltext aus, der in den Daten steht. Eine "
-            "pickle-Datei aus fremder Hand ist ein Programm aus fremder Hand."
+            "`pickle` executes source contained in the data while loading. A "
+            "pickle file from a stranger is a program from a stranger."
         ),
-        remediation="JSON verwenden, oder die Daten signieren und die Signatur vor dem Laden pruefen.",
+        remediation="Use JSON, or sign the data and verify the signature before loading.",
     ),
     Rule(
         name="python-yaml-unsafe",
-        title="yaml.load ohne sicheren Loader",
+        title="yaml.load without a safe loader",
         pattern=re.compile(r"yaml\.load\s*\((?![^)]*Safe)"),
         suffixes=PYTHON,
         severity="high",
         confidence="high",
         explanation=(
-            "`yaml.load` ohne `Loader=SafeLoader` kann beliebige Python-Objekte erzeugen "
-            "und dabei Quelltext ausfuehren."
+            "`yaml.load` without `Loader=SafeLoader` can construct arbitrary Python "
+            "objects and execute source in the process."
         ),
-        remediation="`yaml.safe_load(...)` verwenden, oder `Loader=yaml.SafeLoader` angeben.",
+        remediation="Use `yaml.safe_load(...)`, or pass `Loader=yaml.SafeLoader`.",
     ),
     Rule(
         name="python-tls-verify-off",
-        title="TLS-Pruefung abgeschaltet",
+        title="TLS verification switched off",
         pattern=re.compile(r"verify\s*=\s*False"),
         suffixes=PYTHON,
         severity="high",
         confidence="high",
         explanation=(
-            "Steht `verify` auf falsch, wird jedes Zertifikat angenommen. Damit ist die Verbindung "
-            "verschluesselt, aber der Gegenueber ist beliebig."
+            "With `verify` set to false every certificate is accepted. The "
+            "connection is encrypted, but the other end is anyone."
         ),
         remediation=(
-            "Die Pruefung eingeschaltet lassen. Bei einer eigenen CA deren Zertifikat "
-            "ueber `verify='/pfad/zur/ca.pem'` angeben."
+            "Leave verification on. For a private CA, pass its certificate through "
+            "`verify='/path/to/ca.pem'`."
         ),
     ),
     Rule(
         name="python-tempfile-mktemp",
-        title="tempfile.mktemp erzeugt eine Wettlaufbedingung",
+        title="tempfile.mktemp creates a race condition",
         pattern=re.compile(r"tempfile\.mktemp\s*\("),
         suffixes=PYTHON,
         severity="medium",
         confidence="high",
         explanation=(
-            "`mktemp` gibt nur einen Namen zurueck. Zwischen Name und Oeffnen kann ein "
-            "anderer Prozess die Datei anlegen."
+            "`mktemp` returns only a name. Between the name and the open, another "
+            "process can create the file."
         ),
-        remediation="`tempfile.NamedTemporaryFile` oder `tempfile.mkstemp` verwenden.",
+        remediation="Use `tempfile.NamedTemporaryFile` or `tempfile.mkstemp`.",
     ),
     Rule(
         name="js-eval",
-        title="Text wird im JavaScript als Programm ausgefuehrt",
+        title="Text is executed as a program in JavaScript",
         pattern=re.compile(r"(?<![\w.])(?:eval\s*\(|new\s+Function\s*\()"),
         suffixes=JAVASCRIPT,
         severity="high",
         confidence="medium",
         explanation=(
-            "Beide fuehren Text als Programm aus. Stammt der Text aus einer Eingabe, "
-            "fuehrt der Absender aus, was er will."
+            "Both run text as a program. If the text comes from an input, the "
+            "sender runs whatever they like."
         ),
-        remediation="`JSON.parse` fuer Daten; fuer Verzweigungen ein Objekt als Zuordnungstabelle.",
+        remediation="`JSON.parse` for data; an object as a lookup table for branching.",
     ),
     Rule(
         name="js-child-process-shell",
-        title="child_process.exec mit zusammengesetztem Befehl",
+        title="child_process.exec with an assembled command",
         pattern=re.compile(r"(?:exec)(?:Sync)?\s*\(\s*[`'\"][^)]*(?:\$\{|['\"]\s*\+)"),
         suffixes=JAVASCRIPT,
         severity="high",
         confidence="high",
         explanation=(
-            "`exec` gibt die Zeichenkette an die Shell. Ein eingesetzter Wert wird damit "
-            "zu Quelltext, nicht zu einem Argument."
+            "`exec` hands the string to the shell. A substituted value therefore "
+            "becomes source, not an argument."
         ),
         remediation=(
-            "`execFile` oder `spawn` mit einem Argument-Array verwenden. Die Shell bleibt "
-            "dann aussen vor."
+            "Use `execFile` or `spawn` with an argument array. The shell then stays "
+            "out of it."
         ),
     ),
     Rule(
         name="js-innerhtml",
-        title="Zuweisung an innerHTML",
+        title="Assignment to innerHTML",
         pattern=re.compile(r"\.innerHTML\s*=|\bdocument\.write\s*\("),
         suffixes=JAVASCRIPT,
         severity="medium",
         confidence="medium",
         explanation=(
-            "Was hier hineingeschrieben wird, wird als HTML ausgewertet -- samt "
-            "`<script>` und Ereignis-Attributen. Das ist der klassische Weg zu XSS."
+            "Whatever is written here is parsed as HTML -- `<script>` and event "
+            "attributes included. That is the classic route to XSS."
         ),
-        remediation="`textContent` verwenden, oder die Knoten einzeln erzeugen und anhaengen.",
+        remediation="Use `textContent`, or create and append the nodes individually.",
     ),
     Rule(
         name="js-tls-verify-off",
-        title="TLS-Pruefung abgeschaltet",
+        title="TLS verification switched off",
         pattern=re.compile(r"rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['\"]?0"),
         suffixes=JAVASCRIPT,
         severity="high",
         confidence="high",
-        explanation="Jedes Zertifikat wird angenommen; der Gegenueber ist damit beliebig.",
-        remediation="Die Pruefung eingeschaltet lassen und eine eigene CA ueber `ca:` mitgeben.",
+        explanation="Every certificate is accepted; the other end is therefore anyone.",
+        remediation="Leave verification on and pass a private CA through `ca:`.",
     ),
     Rule(
         name="shell-curl-pipe-shell",
-        title="Heruntergeladenes wird direkt ausgefuehrt",
+        title="What was downloaded is run straight away",
         pattern=re.compile(r"(?:curl|wget)\b[^|\n]*\|\s*(?:sudo\s+)?(?:ba|z|d)?sh\b"),
         suffixes=SHELL,
         severity="high",
         confidence="high",
         explanation=(
-            "Was an dieser Adresse steht, laeuft ungeprueft mit den Rechten des "
-            "Aufrufers -- heute, morgen, und nach jeder Aenderung dort."
+            "Whatever is at that address runs unchecked with the caller's "
+            "permissions -- today, tomorrow, and after every change made there."
         ),
         remediation=(
-            "Herunterladen, Pruefsumme gegen einen bekannten Wert pruefen, dann "
-            "ausfuehren. Oder ein Paket aus einer Quelle installieren, die signiert ist."
+            "Download it, check the checksum against a known value, then run it. "
+            "Or install a package from a source that is signed."
         ),
     ),
     Rule(
         name="shell-eval",
-        title="eval in einem Shell-Skript",
+        title="eval in a shell script",
         pattern=re.compile(r"^\s*eval\s+[^\n]"),
         suffixes=SHELL,
         severity="medium",
         confidence="medium",
-        explanation="`eval` setzt die Zeichenkette erneut als Befehl zusammen; eingesetzte Werte werden zu Quelltext.",
-        remediation="Arrays fuer Argumente verwenden und ohne `eval` aufrufen.",
+        explanation="`eval` reassembles the string as a command; substituted values become source.",
+        remediation="Use arrays for arguments and call without `eval`.",
     ),
 )
 

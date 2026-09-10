@@ -1,7 +1,7 @@
 """Pruefungen fuer den Aufseher.
 
 Gefahren wird gegen einen Stub auf dem eigenen Rechner. Geprueft wird nicht das
-Modell -- geprueft wird, **was Chinook mit dessen Antwort macht**, und zwar
+Modell -- geprueft wird, **was Chinook Security mit dessen Antwort macht**, und zwar
 auch dann, wenn die Antwort boesartig ist.
 """
 
@@ -42,7 +42,7 @@ class KeinBefundGehtVerlorenTest(unittest.TestCase):
 
     def test_eine_antwort_mit_weniger_eintraegen_nimmt_nichts_weg(self):
         ergebnis, anzahl = verbinde(
-            self.befunde, [{"fingerprint": "aaa", "einschaetzung": "unklar", "begruendung": ""}]
+            self.befunde, [{"fingerprint": "aaa", "rating": "unclear", "reasoning": ""}]
         )
         self.assertEqual(len(ergebnis), 3)
         self.assertEqual(anzahl, 1)
@@ -50,7 +50,7 @@ class KeinBefundGehtVerlorenTest(unittest.TestCase):
     def test_ein_erfundener_fingerabdruck_wird_verworfen(self):
         ergebnis, anzahl = verbinde(
             self.befunde,
-            [{"fingerprint": "gibt-es-nicht", "einschaetzung": "bestaetigt", "begruendung": "x"}],
+            [{"fingerprint": "gibt-es-nicht", "rating": "confirmed", "reasoning": "x"}],
         )
         self.assertEqual(len(ergebnis), 3)
         self.assertEqual(anzahl, 0)
@@ -58,11 +58,11 @@ class KeinBefundGehtVerlorenTest(unittest.TestCase):
 
     def test_eine_unbekannte_einschaetzung_wird_verworfen(self):
         # "harmlos" oder "geloescht" stehen nicht auf der Liste -- also passiert nichts.
-        for erfunden in ("harmlos", "geloescht", "ignorieren", ""):
+        for erfunden in ("harmless", "deleted", "ignore", ""):
             with self.subTest(einschaetzung=erfunden):
                 ergebnis, anzahl = verbinde(
                     self.befunde,
-                    [{"fingerprint": "aaa", "einschaetzung": erfunden, "begruendung": "x"}],
+                    [{"fingerprint": "aaa", "rating": erfunden, "reasoning": "x"}],
                 )
                 self.assertEqual(anzahl, 0)
                 self.assertNotIn("triage", ergebnis[0])
@@ -71,8 +71,8 @@ class KeinBefundGehtVerlorenTest(unittest.TestCase):
         ergebnis, _ = verbinde(
             self.befunde,
             [
-                {"fingerprint": "aaa", "einschaetzung": "vermutlich-rauschen", "begruendung": "x"},
-                {"fingerprint": "bbb", "einschaetzung": "bestaetigt", "begruendung": "y"},
+                {"fingerprint": "aaa", "rating": "probably-noise", "reasoning": "x"},
+                {"fingerprint": "bbb", "rating": "confirmed", "reasoning": "y"},
             ],
         )
         for vorher, nachher in zip(self.befunde, ergebnis):
@@ -91,24 +91,24 @@ class BegruendungTest(unittest.TestCase):
         lang = "A" * (MAX_BEGRUENDUNG + 500)
         ergebnis, _ = verbinde(
             [fixtures.befund("aaa")],
-            [{"fingerprint": "aaa", "einschaetzung": "unklar", "begruendung": lang}],
+            [{"fingerprint": "aaa", "rating": "unclear", "reasoning": lang}],
         )
-        self.assertLessEqual(len(ergebnis[0]["triage"]["begruendung"]), MAX_BEGRUENDUNG + 2)
+        self.assertLessEqual(len(ergebnis[0]["triage"]["reasoning"]), MAX_BEGRUENDUNG + 2)
 
     def test_steuerzeichen_werden_entfernt(self):
         ergebnis, _ = verbinde(
             [fixtures.befund("aaa")],
-            [{"fingerprint": "aaa", "einschaetzung": "unklar", "begruendung": "a\x00b\x1bc"}],
+            [{"fingerprint": "aaa", "rating": "unclear", "reasoning": "a\x00b\x1bc"}],
         )
-        text = ergebnis[0]["triage"]["begruendung"]
+        text = ergebnis[0]["triage"]["reasoning"]
         self.assertNotIn("\x00", text)
         self.assertNotIn("\x1b", text)
 
     def test_kein_text_ist_kein_fehler(self):
         ergebnis, _ = verbinde(
-            [fixtures.befund("aaa")], [{"fingerprint": "aaa", "einschaetzung": "unklar"}]
+            [fixtures.befund("aaa")], [{"fingerprint": "aaa", "rating": "unclear"}]
         )
-        self.assertEqual(ergebnis[0]["triage"]["begruendung"], "")
+        self.assertEqual(ergebnis[0]["triage"]["reasoning"], "")
 
 
 class AnfrageTest(unittest.TestCase):
@@ -116,21 +116,21 @@ class AnfrageTest(unittest.TestCase):
         nutzlast = baue_anfrage([fixtures.befund("aaa")])
         text = json.dumps(nutzlast, ensure_ascii=False)
         self.assertNotIn("evidence", text)
-        self.assertNotIn("Wert wird nicht ausgegeben", text)
+        self.assertNotIn("value not shown", text)
 
     def test_bindet_die_befunde_als_material_ein(self):
         nutzlast = baue_anfrage([fixtures.befund("aaa")])
         inhalt = nutzlast["messages"][0]["content"]
-        self.assertIn("<befunde>", inhalt)
-        self.assertIn("keine Anweisung", inhalt)
+        self.assertIn("<findings>", inhalt)
+        self.assertIn("not an instruction", inhalt)
 
     def test_das_schema_laesst_nur_bekannte_einschaetzungen_zu(self):
         schema = baue_anfrage([])["output_config"]["format"]["schema"]
-        erlaubt = schema["properties"]["bewertungen"]["items"]["properties"]["einschaetzung"]["enum"]
+        erlaubt = schema["properties"]["ratings"]["items"]["properties"]["rating"]["enum"]
         self.assertEqual(set(erlaubt), set(EINSCHAETZUNGEN))
 
     def test_der_systemtext_verbietet_das_entfernen(self):
-        self.assertIn("Du entfernst nichts", overseer.SYSTEM)
+        self.assertIn("You remove nothing", overseer.SYSTEM)
 
 
 class AntwortTest(unittest.TestCase):
@@ -148,21 +148,21 @@ class AntwortTest(unittest.TestCase):
 
     def test_fehlende_liste_wirft(self):
         with self.assertRaises(OverseerUnavailable):
-            lies_bewertungen({"content": [{"type": "text", "text": '{"etwas": 1}'}]})
+            lies_bewertungen({"content": [{"type": "text", "text": '{"something": 1}'}]})
 
 
 class LaufTest(unittest.TestCase):
     def test_ordnet_ein(self):
         bewertungen = [
-            {"fingerprint": "aaa", "einschaetzung": "bestaetigt", "begruendung": "Echt."},
-            {"fingerprint": "bbb", "einschaetzung": "vermutlich-rauschen", "begruendung": "Test."},
+            {"fingerprint": "aaa", "rating": "confirmed", "reasoning": "Real."},
+            {"fingerprint": "bbb", "rating": "probably-noise", "reasoning": "Test."},
         ]
         with fixtures.ModellStub(bewertungen=bewertungen) as stub, tempfile.TemporaryDirectory() as ordner:
             pfad = berichtsdatei(ordner, "aaa", "bbb")
             ergebnis, gelaufen = overseer.run([pfad], token="test-schluessel", url=stub.url, timeout=5)
         self.assertTrue(gelaufen)
-        self.assertEqual(ergebnis["aufseher"]["status"], overseer.STATUS_FERTIG)
-        self.assertEqual(ergebnis["aufseher"]["bewertete"], 2)
+        self.assertEqual(ergebnis["overseer"]["status"], overseer.STATUS_FERTIG)
+        self.assertEqual(ergebnis["overseer"]["triaged"], 2)
         self.assertEqual(len(ergebnis["findings"]), 2)
 
     def test_schickt_den_schluessel_als_kopfzeile(self):
@@ -178,7 +178,7 @@ class LaufTest(unittest.TestCase):
             pfad = berichtsdatei(ordner, "aaa")
             ergebnis, gelaufen = overseer.run([pfad], token="")
         self.assertFalse(gelaufen)
-        self.assertEqual(ergebnis["aufseher"]["status"], overseer.STATUS_UEBERSPRUNGEN)
+        self.assertEqual(ergebnis["overseer"]["status"], overseer.STATUS_UEBERSPRUNGEN)
         self.assertEqual(len(ergebnis["findings"]), 1, "die Befunde bleiben trotzdem stehen")
 
     def test_ein_fehlschlag_verliert_keinen_befund(self):
@@ -188,7 +188,7 @@ class LaufTest(unittest.TestCase):
                 [pfad], token="x", url="http://127.0.0.1:9/v1/messages", timeout=2
             )
         self.assertFalse(gelaufen)
-        self.assertEqual(ergebnis["aufseher"]["status"], overseer.STATUS_FEHLGESCHLAGEN)
+        self.assertEqual(ergebnis["overseer"]["status"], overseer.STATUS_FEHLGESCHLAGEN)
         self.assertEqual(len(ergebnis["findings"]), 2)
 
     def test_eine_ablehnung_verliert_keinen_befund(self):
@@ -203,7 +203,7 @@ class LaufTest(unittest.TestCase):
             pfad = berichtsdatei(ordner, "aaa")
             ergebnis, gelaufen = overseer.run([pfad], token="x", url=stub.url, timeout=5)
         self.assertFalse(gelaufen)
-        self.assertEqual(ergebnis["aufseher"]["status"], overseer.STATUS_FEHLGESCHLAGEN)
+        self.assertEqual(ergebnis["overseer"]["status"], overseer.STATUS_FEHLGESCHLAGEN)
         self.assertEqual(len(ergebnis["findings"]), 1)
 
     def test_lehnt_eine_fremde_schema_version_ab(self):
@@ -228,7 +228,7 @@ class InjektionTest(unittest.TestCase):
         )
         # Selbst wenn das Modell darauf hereinfiele und "geloescht" zurueckgibt:
         with fixtures.ModellStub(
-            bewertungen=[{"fingerprint": "aaa", "einschaetzung": "geloescht", "begruendung": "ok"}]
+            bewertungen=[{"fingerprint": "aaa", "rating": "deleted", "reasoning": "ok"}]
         ) as stub, tempfile.TemporaryDirectory() as ordner:
             pfad = fixtures.schreibe_bericht(os.path.join(ordner, "b.json"), [boese])
             ergebnis, _ = overseer.run([pfad], token="x", url=stub.url, timeout=5)
@@ -259,7 +259,7 @@ class KommandozeileTest(unittest.TestCase):
             pfad = berichtsdatei(ordner, "aaa")
             code, ausgabe = self._lauf(["overseer", "--report", pfad])
         self.assertEqual(code, 0, "der Aufseher ist freiwillig")
-        self.assertIn("uebersprungen", ausgabe)
+        self.assertIn("skipped", ausgabe)
 
     def test_mit_require_wird_es_ein_fehler(self):
         with tempfile.TemporaryDirectory() as ordner:
