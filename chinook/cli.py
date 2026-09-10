@@ -26,11 +26,11 @@ BOTS = {
 OK, BEFUNDE, UNBEWIESEN = 0, 1, 2
 
 _SEVERITY_LABEL = {
-    "critical": "kritisch",
-    "high": "hoch",
-    "medium": "mittel",
-    "low": "niedrig",
-    "info": "Hinweis",
+    "critical": "critical",
+    "high": "high",
+    "medium": "medium",
+    "low": "low",
+    "info": "info",
 }
 
 
@@ -119,7 +119,7 @@ def _aufseher(args) -> int:
     Urteil bereits gefaellt. Wer das anders haben will, nimmt `--require`.
     """
     if not args.reports:
-        print("overseer: --report fehlt (mindestens ein Befundbericht)", file=sys.stderr)
+        print("overseer: --report is missing (at least one findings report)", file=sys.stderr)
         return UNBEWIESEN
 
     ergebnis, gelaufen = overseer.run(
@@ -131,24 +131,24 @@ def _aufseher(args) -> int:
     if args.json_out:
         _write(args.json_out, ergebnis)
 
-    stand = ergebnis["aufseher"]
+    stand = ergebnis["overseer"]
     print(f"overseer: {stand['status']}")
-    if stand["grund"]:
-        print(f"  {stand['grund']}")
+    if stand["reason"]:
+        print(f"  {stand['reason']}")
     if gelaufen:
-        print(f"  {stand['bewertete']} von {ergebnis['summary']['total']} Befund(en) eingeordnet")
-        print(f"  Modell: {stand['modell']}")
+        print(f"  {stand['triaged']} of {ergebnis['summary']['total']} finding(s) triaged")
+        print(f"  model: {stand['model']}")
         for befund in ergebnis["findings"]:
             triage = befund.get("triage")
             if triage:
                 ort = befund.get("location", {})
                 print(
-                    f"  [{triage['einschaetzung']}] {ort.get('path')}:{ort.get('line')} "
+                    f"  [{triage['rating']}] {ort.get('path')}:{ort.get('line')} "
                     f"{befund.get('rule')}"
                 )
     if not gelaufen and args.require:
         print(
-            "\nFehlgeschlagen: --require verlangt eine Einschaetzung, es gibt keine.",
+            "\nFailed: --require demands a triage, and there is none.",
             file=sys.stderr,
         )
         return UNBEWIESEN
@@ -173,9 +173,9 @@ def main(argv=None) -> int:
             results = module.run(args.path, excludes)
     except dependency_bot.OsvUnavailable as fehler:
         print(
-            f"{args.bot}: die Abfrage ist fehlgeschlagen -- {fehler}\n"
-            "Dieser Lauf sagt nichts darueber aus, ob Schwachstellen vorliegen. "
-            "Er gilt deshalb nicht als bestanden.",
+            f"{args.bot}: the query failed -- {fehler}\n"
+            "This run says nothing about whether vulnerabilities are present. "
+            "It therefore does not count as passing.",
             file=sys.stderr,
         )
         return UNBEWIESEN
@@ -186,7 +186,7 @@ def main(argv=None) -> int:
     if args.sarif_out:
         _write(args.sarif_out, fmt.to_sarif(args.bot, results))
 
-    print(f"{args.bot}: {report['summary']['total']} Befund(e)")
+    print(f"{args.bot}: {report['summary']['total']} finding(s)")
     for level in fmt.SEVERITIES:
         count = report["summary"]["by_severity"][level]
         if count:
@@ -199,7 +199,7 @@ def main(argv=None) -> int:
 
     if fmt.exceeds(results, args.fail_on):
         print(
-            f"\nFehlgeschlagen: mindestens ein Befund erreicht die Schwelle "
+            f"\nFailed: at least one finding reaches the threshold "
             f"'{_SEVERITY_LABEL.get(args.fail_on, args.fail_on)}'.",
             file=sys.stderr,
         )

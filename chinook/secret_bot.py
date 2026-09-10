@@ -44,15 +44,13 @@ class Rule:
 
 
 _ROTATE = (
-    "Den Schluessel als kompromittiert behandeln: beim Anbieter widerrufen und "
-    "neu ausstellen, dann aus dem Quelltext entfernen und ueber ein Repo-Secret "
-    "einspeisen. Ein Commit zu loeschen genuegt nicht -- die History bleibt."
+    "Treat the key as compromised: revoke it with the provider and issue a new one, then remove it from the source and supply it through a repository secret. Deleting a commit is not enough -- the history stays."
 )
 
 RULES: tuple[Rule, ...] = (
     Rule(
         name="aws-access-key-id",
-        title="AWS Access Key ID im Quelltext",
+        title="AWS access key ID in the source",
         pattern=re.compile(r"\b((?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16})\b"),
         severity="critical",
         confidence="high",
@@ -61,7 +59,7 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         name="github-token",
-        title="GitHub-Token im Quelltext",
+        title="GitHub token in the source",
         pattern=re.compile(r"\b(gh[pousr]_[A-Za-z0-9]{36,255})\b"),
         severity="critical",
         confidence="high",
@@ -70,7 +68,7 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         name="huggingface-token",
-        title="Hugging-Face-Token im Quelltext",
+        title="Hugging Face token in the source",
         pattern=re.compile(r"\b(hf_[A-Za-z0-9]{34,})\b"),
         severity="critical",
         confidence="high",
@@ -79,7 +77,7 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         name="anthropic-key",
-        title="Anthropic-API-Schluessel im Quelltext",
+        title="Anthropic API key in the source",
         pattern=re.compile(r"\b(sk-ant-[A-Za-z0-9_\-]{24,})\b"),
         severity="critical",
         confidence="high",
@@ -88,7 +86,7 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         name="openai-key",
-        title="OpenAI-API-Schluessel im Quelltext",
+        title="OpenAI API key in the source",
         pattern=re.compile(r"\b(sk-(?!ant-)[A-Za-z0-9]{32,})\b"),
         severity="critical",
         confidence="high",
@@ -97,7 +95,7 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         name="slack-token",
-        title="Slack-Token im Quelltext",
+        title="Slack token in the source",
         pattern=re.compile(r"\b(xox[abprs]-[A-Za-z0-9\-]{10,})\b"),
         severity="critical",
         confidence="high",
@@ -106,7 +104,7 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         name="google-api-key",
-        title="Google-API-Schluessel im Quelltext",
+        title="Google API key in the source",
         pattern=re.compile(r"\b(AIza[0-9A-Za-z_\-]{35})\b"),
         severity="critical",
         confidence="high",
@@ -115,18 +113,18 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         name="private-key-block",
-        title="Privater Schluessel im Quelltext",
+        title="Private key in the source",
         pattern=re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----"),
         severity="critical",
         confidence="high",
         remediation=(
-            "Das Schluesselpaar neu erzeugen und das alte widerrufen. Private "
-            "Schluessel gehoeren nie in ein Repo, auch nicht in ein privates."
+            "Generate a new key pair and revoke the old one. Private keys never "
+            "belong in a repository, not even a private one."
         ),
     ),
     Rule(
         name="assigned-credential",
-        title="Zugangsdaten an eine Variable zugewiesen",
+        title="Credentials assigned to a variable",
         pattern=re.compile(
             r"""(?ix)
             \b (?: api[_-]?key | apikey | secret[_-]?key | access[_-]?token
@@ -138,9 +136,9 @@ RULES: tuple[Rule, ...] = (
         severity="high",
         confidence="medium",
         remediation=(
-            "Den Wert in ein Repo-Secret verschieben und ueber die Umgebung "
-            "einlesen. Ist es ein Platzhalter, erkennbar machen "
-            "(z. B. `<hier-einsetzen>` oder `${VARIABLE}`)."
+            "Move the value into a repository secret and read it from the "
+            "environment. If it is a placeholder, make that recognisable "
+            "(e.g. `<put-it-here>` or `${VARIABLE}`)."
         ),
         group=1,
     ),
@@ -208,7 +206,7 @@ def iter_files(root: str, excludes=()):
             yield rel, full
 
 
-def scan_text(text: str, path: str, *, source: str = "Arbeitsbaum") -> list[Finding]:
+def scan_text(text: str, path: str, *, source: str = "working tree") -> list[Finding]:
     """Der eigentliche Musterabgleich. Getrennt vom Dateisystem, damit er auch
     fuer die History-Pruefung wiederverwendbar und einzeln pruefbar ist."""
     findings: list[Finding] = []
@@ -230,8 +228,8 @@ def scan_text(text: str, path: str, *, source: str = "Arbeitsbaum") -> list[Find
                         path=path,
                         line=number,
                         explanation=(
-                            f"In {path}, Zeile {number} ({source}) steht etwas, das dem "
-                            f"Format eines Geheimnisses entspricht."
+                            f"{path}, line {number} ({source}) contains something that "
+                            f"matches the shape of a secret."
                         ),
                         remediation=rule.remediation,
                         evidence=redact(value, kind=rule.name),
@@ -298,7 +296,7 @@ def scan_history(root: str, max_commits: int = 500) -> list[Finding]:
             continue
         if not raw_line.startswith("+") or raw_line.startswith("+++"):
             continue
-        for finding in scan_text(raw_line[1:], path, source=f"History, Commit {commit}"):
+        for finding in scan_text(raw_line[1:], path, source=f"history, commit {commit}"):
             key = (finding.rule, finding.path, finding.evidence)
             if key in seen:
                 continue
@@ -313,9 +311,9 @@ def scan_history(root: str, max_commits: int = 500) -> list[Finding]:
                     path=finding.path,
                     line=1,
                     explanation=(
-                        f"In der History (Commit {commit}) wurde in {finding.path} etwas "
-                        f"hinzugefuegt, das dem Format eines Geheimnisses entspricht. "
-                        f"Die aktuelle Datei kann sauber sein -- die History ist es nicht."
+                        f"The history (commit {commit}) added something to {finding.path} "
+                        f"that matches the shape of a secret. The current file may be "
+                        f"clean -- the history is not."
                     ),
                     remediation=finding.remediation,
                     evidence=finding.evidence,

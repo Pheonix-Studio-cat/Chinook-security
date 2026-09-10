@@ -103,8 +103,8 @@ class KeineDriftTest(unittest.TestCase):
 class GegenprobeAufDerSeiteTest(unittest.TestCase):
     def test_ohne_ergebnis_wird_nichts_behauptet(self):
         text = seite(None)
-        self.assertIn("kein Ergebnis vor", text)
-        self.assertNotIn("Mutationen gefangen", text)
+        self.assertIn("No result is available", text)
+        self.assertNotIn("mutations caught", text)
 
     def test_mit_ergebnis_stehen_die_zahlen_da(self):
         text = seite(
@@ -117,8 +117,8 @@ class GegenprobeAufDerSeiteTest(unittest.TestCase):
                 ],
             }
         )
-        self.assertIn("25 von 25 Mutationen gefangen", text)
-        self.assertIn("gefangen</span>", text)
+        self.assertIn("25 of 25 mutations caught", text)
+        self.assertIn("caught</span>", text)
 
     def test_eine_entkommene_mutation_wird_nicht_versteckt(self):
         text = seite(
@@ -132,12 +132,12 @@ class GegenprobeAufDerSeiteTest(unittest.TestCase):
                 ],
             }
         )
-        self.assertIn("1 von 2 Mutationen gefangen", text)
-        self.assertIn("ENTKOMMEN", text)
+        self.assertIn("1 of 2 mutations caught", text)
+        self.assertIn("ESCAPED", text)
 
     def test_ein_roter_grundlauf_wird_gesagt(self):
         text = seite({"grundlauf": "rot", "gesamt": 25, "gefangen": 0, "mutationen": []})
-        self.assertIn("nicht gruen", text)
+        self.assertIn("was not green", text)
 
 
 class KeineFremdenRessourcenTest(unittest.TestCase):
@@ -181,7 +181,7 @@ class BauTest(unittest.TestCase):
             self.assertTrue(ziel.is_file())
             inhalt = ziel.read_text(encoding="utf-8")
         self.assertTrue(inhalt.startswith("<!doctype html>"))
-        self.assertIn('<html lang="de">', inhalt)
+        self.assertIn('<html lang="en">', inhalt)
         self.assertIn("viewport", inhalt)
 
     def test_eine_fehlende_gegenprobe_ist_kein_fehler(self):

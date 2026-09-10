@@ -220,7 +220,7 @@ class ModellStub:
                     nutzlast = koerper
                 else:
                     inhalt = text if text is not None else _json.dumps(
-                        {"bewertungen": bewertungen or []}, ensure_ascii=False
+                        {"ratings": bewertungen or []}, ensure_ascii=False
                     )
                     nutzlast = _json.dumps(
                         {

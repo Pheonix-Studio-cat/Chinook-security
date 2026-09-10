@@ -331,7 +331,7 @@ class UnerreichbarTest(unittest.TestCase):
                     ]
                 )
             self.assertEqual(code, 2, "ein misslungener Abruf darf nicht als bestanden gelten")
-            self.assertIn("nicht als bestanden", puffer.getvalue())
+            self.assertIn("does not count as passing", puffer.getvalue())
 
 
 class ZuordnungTest(unittest.TestCase):

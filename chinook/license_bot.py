@@ -129,14 +129,13 @@ def _pruefe_kennung(kennung: str, path: str, line: int, datei_familie: str | Non
         befunde.append(
             _befund(
                 "license-unrecognised",
-                "Erklaerte Lizenz ist keine bekannte SPDX-Kennung",
+                "Declared licence is not a known SPDX identifier",
                 "info",
                 path,
                 line,
-                f"`{kennung}` steht nicht auf der Liste der hier bekannten Kennungen. "
-                f"Das heisst nicht, dass sie falsch ist -- es heisst, dass dieser Bot sie "
-                f"nicht bestaetigen kann. {_PRUEFEN}",
-                "Eine SPDX-Kennung eintragen, oder von Hand pruefen und den Befund abnicken.",
+                f"`{kennung}` is not on the list of identifiers known here. That does "
+                f"not mean it is wrong -- it means this bot cannot confirm it. {_PRUEFEN}",
+                "Enter an SPDX identifier, or check by hand and accept the finding.",
                 confidence="medium",
             )
         )
@@ -146,15 +145,15 @@ def _pruefe_kennung(kennung: str, path: str, line: int, datei_familie: str | Non
         befunde.append(
             _befund(
                 "license-mismatch",
-                "Erklaerte Lizenz und beiliegender Text gehen auseinander",
+                "Declared licence and the accompanying text disagree",
                 "medium",
                 path,
                 line,
-                f"Erklaert ist `{kennung}`; der Text der Lizenzdatei sieht nach "
-                f"`{datei_familie}` aus. Welche gilt, entscheidet dieser Bot nicht. "
+                f"Declared is `{kennung}`; the text of the licence file looks like "
+                f"`{datei_familie}`. Which one applies is not for this bot to decide. "
                 f"{_PRUEFEN}",
-                "Erklaerung und Datei in Uebereinstimmung bringen -- und pruefen, welche "
-                "von beiden die Absicht war.",
+                "Bring the declaration and the file into agreement -- and check which of "
+                "the two was intended.",
                 confidence="medium",
             )
         )
@@ -173,14 +172,14 @@ def run(root: str, excludes=()) -> list[Finding]:
         befunde.append(
             _befund(
                 "license-file-missing",
-                "Keine Lizenzdatei im Wurzelverzeichnis",
+                "No licence file in the root directory",
                 "medium",
                 "LICENSE",
                 1,
-                "Ohne Lizenzdatei ist unklar, was jemand mit dem Quelltext darf. Ohne "
-                "Erlaubnis gilt im Zweifel: nichts.",
-                "Eine Lizenzdatei anlegen. Wenn die Wahl unklar ist, vorher entscheiden "
-                "statt provisorisch etwas hinzulegen.",
+                "Without a licence file it is unclear what anyone may do with the "
+                "source. Without permission, in doubt: nothing.",
+                "Add a licence file. If the choice is unclear, decide first rather than "
+                "putting something there provisionally.",
             )
         )
 
@@ -203,13 +202,13 @@ def run(root: str, excludes=()) -> list[Finding]:
             befunde.append(
                 _befund(
                     "license-undeclared",
-                    "package.json erklaert keine Lizenz",
+                    "package.json declares no licence",
                     "medium",
                     "package.json",
                     zeile,
-                    "Ohne `license`-Feld nimmt npm keine Lizenz an, und wer das Paket "
-                    "einbindet, kann nicht pruefen, ob er darf.",
-                    "Ein `license`-Feld mit einer SPDX-Kennung eintragen.",
+                    "Without a `license` field npm assumes no licence, and whoever "
+                    "depends on the package cannot check whether they may.",
+                    "Add a `license` field with an SPDX identifier.",
                 )
             )
         elif isinstance(kennung, str):
@@ -220,13 +219,13 @@ def run(root: str, excludes=()) -> list[Finding]:
                     befunde.append(
                         _befund(
                             "license-link-broken",
-                            "Die erklaerte Lizenz verweist auf eine Datei, die es nicht gibt",
+                            "The declared licence points at a file that does not exist",
                             "medium",
                             "package.json",
                             zeile,
-                            f"`{kennung}` zeigt auf `{ziel}` -- dort liegt nichts. Damit "
-                            f"gibt es keine nachlesbaren Bedingungen. {_PRUEFEN}",
-                            "Die Datei ergaenzen oder auf eine SPDX-Kennung umstellen.",
+                            f"`{kennung}` points at `{ziel}` -- there is nothing there. "
+                            f"So there are no terms to read. {_PRUEFEN}",
+                            "Add the file, or switch to an SPDX identifier.",
                         )
                     )
             else:
@@ -246,13 +245,13 @@ def run(root: str, excludes=()) -> list[Finding]:
                 befunde.append(
                     _befund(
                         "license-link-broken",
-                        "Die erklaerte Lizenz verweist auf eine Datei, die es nicht gibt",
+                        "The declared licence points at a file that does not exist",
                         "medium",
                         "pyproject.toml",
                         zeile,
-                        f"`license = {{file = \"{verweis}\"}}` zeigt auf eine Datei, die "
-                        f"nicht existiert. {_PRUEFEN}",
-                        "Die Datei ergaenzen oder auf eine SPDX-Kennung umstellen.",
+                        f"`license = {{file = \"{verweis}\"}}` points at a file that does "
+                        f"not exist. {_PRUEFEN}",
+                        "Add the file, or switch to an SPDX identifier.",
                     )
                 )
         elif kennung:
@@ -261,13 +260,13 @@ def run(root: str, excludes=()) -> list[Finding]:
             befunde.append(
                 _befund(
                     "license-undeclared",
-                    "pyproject.toml erklaert keine Lizenz",
+                    "pyproject.toml declares no licence",
                     "medium",
                     "pyproject.toml",
                     1,
-                    "Im `[project]`-Abschnitt fehlt `license`. Wer das Paket einbindet, "
-                    "kann nicht pruefen, ob er darf.",
-                    "Ein `license`-Feld mit einer SPDX-Kennung eintragen.",
+                    "The `[project]` section has no `license`. Whoever depends on the "
+                    "package cannot check whether they may.",
+                    "Add a `license` field with an SPDX identifier.",
                 )
             )
     return befunde
@@ -276,38 +275,37 @@ def run(root: str, excludes=()) -> list[Finding]:
 REGELN = (
     {
         "name": "license-file-missing",
-        "titel": "Keine Lizenzdatei im Wurzelverzeichnis",
+        "titel": "No licence file in the root directory",
         "schwere": "medium",
-        "was": "Ohne Erlaubnis gilt im Zweifel: nichts.",
+        "was": "Without permission, in doubt: nothing.",
     },
     {
         "name": "license-undeclared",
-        "titel": "Das Paket erklaert keine Lizenz",
+        "titel": "The package declares no licence",
         "schwere": "medium",
-        "was": "Wer es einbindet, kann nicht pruefen, ob er darf.",
+        "was": "Whoever depends on it cannot check whether they may.",
     },
     {
         "name": "license-link-broken",
-        "titel": "Die erklaerte Lizenz verweist ins Leere",
+        "titel": "The declared licence points nowhere",
         "schwere": "medium",
-        "was": "Die angegebene Datei existiert nicht -- es gibt keine nachlesbaren Bedingungen.",
+        "was": "The file named does not exist -- there are no terms to read.",
     },
     {
         "name": "license-mismatch",
-        "titel": "Erklaerung und beiliegender Text gehen auseinander",
+        "titel": "Declaration and accompanying text disagree",
         "schwere": "medium",
         "was": (
-            "Welche gilt, entscheidet dieser Bot nicht. "
+            "Which one applies is not for this bot to decide. "
             "License status requires verification."
         ),
     },
     {
         "name": "license-unrecognised",
-        "titel": "Keine bekannte SPDX-Kennung",
+        "titel": "Not a known SPDX identifier",
         "schwere": "info",
         "was": (
-            "Das heisst nicht, dass sie falsch ist -- es heisst, dass der Bot "
-            "sie nicht bestaetigen kann."
+            "That does not mean it is wrong -- it means the bot cannot confirm it."
         ),
     },
 )

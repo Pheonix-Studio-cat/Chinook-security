@@ -2,7 +2,7 @@ name: "Chinook Aufseher"
 description: >-
   Ordnet die Befunde der Bots ein: was ist echt, was ist Rauschen, was ist
   unklar. Er entfernt nichts und aendert keinen Schweregrad -- er haengt eine
-  Einschaetzung an. Ohne Schluessel wird er uebersprungen, und der Lauf bleibt
+  Einschaetzung an. Ohne Schluessel meldet er `skipped`, und der Lauf bleibt
   gruen: die Befunde der Bots stehen unveraendert.
 author: "PHÖNIX STUDIO"
 
@@ -30,7 +30,7 @@ outputs:
     description: "Pfad des eingeordneten Berichts."
     value: ${{ steps.lauf.outputs.report }}
   status:
-    description: "bewertet, uebersprungen oder fehlgeschlagen."
+    description: "triaged, skipped oder failed."
     value: ${{ steps.lauf.outputs.status }}
 
 runs:
@@ -69,9 +69,9 @@ runs:
         status=0
         python3 -m chinook.cli "${argumente[@]}" || status=$?
         if [ -f "$CHINOOK_REPORT" ]; then
-          stand=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["aufseher"]["status"])' "$CHINOOK_REPORT")
+          stand=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["overseer"]["status"])' "$CHINOOK_REPORT")
         else
-          stand="fehlgeschlagen"
+          stand="failed"
         fi
         echo "status=$stand" >> "$GITHUB_OUTPUT"
         exit "$status"

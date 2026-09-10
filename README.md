@@ -9,9 +9,11 @@ an extra in Chinook but the core — every rule is run against a deliberately
 broken case, and every check is run against a deliberately broken bot. Whatever
 stays green is treated as worthless, and said so.
 
-> **The documentation is German.** `docs/`, the code comments and the commit
-> messages are written in German, because that is the project owner's language.
-> This README is English so the tool can be used without it.
+> **English is the default; German where it is more practical.** Everything a
+> stranger reads is English — this README, the website, the findings the bots
+> emit, the field names in the reports. `docs/`, the code comments and the
+> commit messages stay German, because that is the project owner's language and
+> nobody else needs them.
 
 ---
 

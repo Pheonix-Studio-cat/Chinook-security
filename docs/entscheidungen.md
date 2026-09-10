@@ -5,6 +5,39 @@ neu verhandelt.
 
 ---
 
+## Englisch für alles, was nach aussen geht
+
+**Entschieden am 2026-09-10, vom Projektinhaber.** Vorher war alles deutsch —
+richtig, solange das Repo privat war, und falsch, seit es öffentlich ist.
+
+Die Trennlinie verläuft nicht zwischen „Code" und „Doku", sondern zwischen
+**wer es liest**:
+
+| englisch | deutsch |
+| --- | --- |
+| `README.md`, die Website | `docs/`, `SECURITY.md`, `CONTRIBUTING.md` |
+| Befundtexte, Kommandozeilen-Ausgabe, Berichte | Kommentare im Quelltext |
+| Feldnamen und Werte in JSON, Regel- und Mutationsnamen | Commit-Meldungen, PR-Texte |
+
+Was in ein fremdes Repo wandert oder in einem fremden Action-Log landet, ist
+englisch. Was nur der Projektinhaber und ich lesen, bleibt deutsch — dort ist
+Deutsch das Praktischere, und eine Übersetzung um ihrer selbst willen erzeugt
+nur Diff-Rauschen.
+
+**Wo die Regel bewusst endet:** die Namen interner Funktionen (`baue`,
+`verbinde`, `regeln`), die CSS-Variablen und Klassennamen der Website
+(`--kritisch`, `.gefangen`) und die Variablennamen in den Skripten bleiben
+deutsch. Sie sind weder Ausgabe noch Schnittstelle — sie umzubenennen wäre ein
+grosser Diff ohne einen einzigen Leser, dem es hilft.
+
+**Ein Bruch am Ausgabeformat gehört dazu.** Die Werte des Aufsehers heissen
+jetzt `confirmed`, `probably-real`, `probably-noise`, `unclear`; die Zustände
+`triaged`, `skipped`, `failed`; der Berichtsschlüssel `overseer` statt
+`aufseher`. Bei Fassung 0.1.0 und ohne fremde Nutzer ist das der richtige
+Zeitpunkt — später wäre es einer mit Zuschauern.
+
+---
+
 ## Keine Abhängigkeiten, nur Standardbibliothek
 
 Ein Sicherheitswerkzeug mit dreihundert transitiven Paketen ist selbst eine

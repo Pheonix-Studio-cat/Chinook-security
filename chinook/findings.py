@@ -43,7 +43,7 @@ def redact(raw: str, kind: str = "Treffer") -> str:
     genug, um zwei Funde zu unterscheiden, zu wenig, um einen zu benutzen.
     """
     text = "" if raw is None else str(raw)
-    return f"{kind}, {len(text)} Zeichen (Wert wird nicht ausgegeben)"
+    return f"{kind}, {len(text)} characters (value not shown)"
 
 
 def severity_rank(severity: str) -> int:

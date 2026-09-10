@@ -84,19 +84,19 @@ def parse_requirements(text: str, path: str) -> tuple[list[Dependency], list[Fin
                 Finding(
                     bot=BOT,
                     rule="dependency-unpinned",
-                    title="Abhaengigkeit ist nicht auf eine Version festgelegt",
+                    title="Dependency is not pinned to a version",
                     severity="low",
                     confidence="high",
                     path=path,
                     line=number,
                     explanation=(
-                        f"`{name}` ist ohne `==` angegeben. Damit installiert jeder Lauf "
-                        "moeglicherweise etwas anderes, und diese Pruefung sagt nichts "
-                        "ueber das aus, was tatsaechlich installiert wird."
+                        f"`{name}` is given without `==`. Every run may therefore install "
+                        "something different, and this check says nothing about what is "
+                        "actually installed."
                     ),
                     remediation=(
-                        "Auf eine genaue Version festlegen (`==`) oder eine Sperrdatei "
-                        "verwenden, die der Lauf tatsaechlich installiert."
+                        "Pin an exact version (`==`), or use a lockfile that the run "
+                        "actually installs from."
                     ),
                 )
             )
@@ -401,7 +401,7 @@ def to_findings(deps, treffer: dict[int, list[str]]) -> list[Finding]:
             Finding(
                 bot=BOT,
                 rule="known-vulnerability",
-                title="Abhaengigkeit mit bekannter Schwachstelle",
+                title="Dependency with a known vulnerability",
                 # Chinook stuft nicht selbst ein: jede bekannte Schwachstelle
                 # ist "hoch". Das Einordnen ist Sache des Aufsehers, nicht eine
                 # Zahl, die wir uns ausdenken.
@@ -410,16 +410,16 @@ def to_findings(deps, treffer: dict[int, list[str]]) -> list[Finding]:
                 path=dep.path,
                 line=dep.line,
                 explanation=(
-                    f"`{dep.name}` {dep.version} ({dep.ecosystem}) ist laut OSV von "
-                    f"{len(kennungen)} bekannten Schwachstelle(n) betroffen: "
-                    + ", ".join(kennungen[:5])
-                    + ("" if len(kennungen) <= 5 else " u. a.")
+                    f"`{dep.name}` {dep.version} ({dep.ecosystem}) is affected by "
+                    f"{len(kennungen)} known vulnerability/vulnerabilities according to "
+                    "OSV: " + ", ".join(kennungen[:5])
+                    + ("" if len(kennungen) <= 5 else " and others")
                 ),
                 remediation=(
-                    "Auf eine Version aktualisieren, die die Advisories nicht mehr "
-                    f"betrifft. Einzelheiten: {OSV_VULN_URL}{erste}"
+                    "Update to a version the advisories no longer affect. Details: "
+                    f"{OSV_VULN_URL}{erste}"
                 ),
-                evidence=f"{len(kennungen)} Advisory(s)",
+                evidence=f"{len(kennungen)} advisory/advisories",
             )
         )
     return befunde
@@ -435,22 +435,22 @@ def run(root: str, excludes=(), url: str = OSV_URL, timeout: int = TIMEOUT) -> l
 REGELN = (
     {
         "name": "known-vulnerability",
-        "titel": "Abhaengigkeit mit bekannter Schwachstelle",
+        "titel": "Dependency with a known vulnerability",
         "schwere": "high",
         "was": (
-            "Laut OSV.dev betrifft mindestens ein Advisory diese Version. "
-            "Chinook stuft nicht selbst ein -- jede bekannte Schwachstelle ist "
-            "\u201ehoch\u201c, das Einordnen ist Sache des Aufsehers."
+            "According to OSV.dev at least one advisory affects this version. "
+            "Chinook does not rate severity itself -- every known vulnerability is "
+            "\u201ehigh\u201c, and rating is the overseer's job."
         ),
     },
     {
         "name": "dependency-unpinned",
-        "titel": "Abhaengigkeit ist nicht auf eine Version festgelegt",
+        "titel": "Dependency is not pinned to a version",
         "schwere": "low",
         "was": (
-            "Ohne `==` installiert jeder Lauf moeglicherweise etwas anderes, "
-            "und die Pruefung sagt nichts ueber das aus, was installiert wird. "
-            "Nur bei `requirements.txt` -- eine Sperrdatei legt sich von selbst fest."
+            "Without `==` every run may install something different, and the check "
+            "says nothing about what is installed. Only for `requirements.txt` -- a "
+            "lockfile pins itself."
         ),
     },
 )
