@@ -305,6 +305,15 @@ Und sie zeigt den **Stand der Gegenprobe** — welche Mutation gefangen wurde un
 welche nicht. Liegt kein Ergebnis vor, sagt sie das, statt etwas zu behaupten.
 Der Bau läuft bei jedem Merge auf `main` und einmal wöchentlich.
 
+Veröffentlicht wird über den Branch **`gh-pages`**, nicht über
+`actions/deploy-pages`: das hätte eine Einstellung im Repo vorausgesetzt, die
+niemand im Quelltext sieht. Das Anlegen des Branches hat GitHub Pages dagegen
+von selbst aktiviert. Jeder Lauf schreibt einen einzelnen Commit ohne
+Vorgeschichte — der Branch ist erzeugter Inhalt, kein Ort zum Bearbeiten.
+
+Die Seite liegt unter
+`https://pheonix-studio-cat.github.io/Chinook-security/`.
+
 ## Der Wochenlauf
 
 Montags: Prüfungen, Gegenprobe und alle fünf Bots über das eigene Repo, ohne

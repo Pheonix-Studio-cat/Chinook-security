@@ -140,8 +140,14 @@ gefunden. Die Regeln stehen vollständig in `chinook/secret_bot.py` und
 - **Der Stand der Gegenprobe stammt vom letzten Bau** -- bei jedem Merge auf
   `main` und einmal woechentlich. Was dazwischen passiert, steht nicht darauf.
 - **Kein Suchfeld, keine Navigation, kein Skript.** Eine Seite, eine Datei.
-- **GitHub Pages muss im Repo eingeschaltet sein** (Settings -> Pages -> Source:
-  GitHub Actions). Ohne das laeuft der Bau, aber die Veroeffentlichung scheitert.
+- **Veroeffentlicht wird ueber den Branch `gh-pages`**, nicht ueber
+  `actions/deploy-pages`. Der Grund steht in `entscheidungen.md`: Pages war im
+  Repo nicht eingeschaltet, und das Anlegen des Branches hat es von selbst
+  aktiviert. Damit haengt der Workflow an keiner Einstellung, die jemand
+  vergessen kann.
+- **Der Branch ist erzeugter Inhalt.** Jeder Lauf schreibt einen einzelnen
+  Commit ohne Vorgeschichte und setzt den Branch mit `--force`. Wer dort etwas
+  von Hand aendert, verliert es beim naechsten Merge auf `main`.
 
 ## Die Gegenprobe dauert
 

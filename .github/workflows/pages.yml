@@ -1,9 +1,16 @@
 # Baut die Website und veroeffentlicht sie auf GitHub Pages.
 #
+# **Ueber den Branch `gh-pages`, nicht ueber `actions/deploy-pages`.** Der Grund
+# ist der Weg dorthin: Pages war im Repo nicht eingeschaltet, und die Einstellung
+# laesst sich nur von Hand setzen. Das Anlegen eines `gh-pages`-Branches hat
+# Pages dagegen von selbst aktiviert (`has_pages` sprang auf `true`). Damit
+# braucht dieser Workflow keine Einstellung, die jemand vergessen kann.
+#
 # Die Seite wird **erzeugt**, nicht gepflegt: jede Regel darauf kommt aus dem
 # Bot, der sie anwendet. Und sie zeigt den Stand der Gegenprobe -- deshalb wird
-# die hier zuerst gefahren. Ist sie rot, wird nichts veroeffentlicht: eine
-# Seite, die einen falschen Stand zeigt, ist schlimmer als keine.
+# die hier zuerst gefahren. Ist sie rot, bricht der Lauf ab und es wird nichts
+# veroeffentlicht: eine Seite, die einen falschen Stand zeigt, ist schlimmer
+# als keine.
 name: Website
 
 on:
@@ -23,8 +30,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  bauen:
+  veroeffentlichen:
     runs-on: ubuntu-latest
+    # Nur dieser Job darf schreiben, und nur, um den erzeugten Branch zu
+    # setzen. Kein `write-all`.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -34,21 +45,25 @@ jobs:
       - name: Seite bauen
         run: python3 -m webseite.build --gegenprobe chinook-gegenprobe.json
 
-      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
-        with:
-          path: webseite/out
-
-  veroeffentlichen:
-    needs: bauen
-    runs-on: ubuntu-latest
-    # Nur dieser Job bekommt die Rechte, die das Veroeffentlichen braucht --
-    # nicht der ganze Workflow.
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - id: deploy
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+      # Der Push laeuft ueber die Zugangsdaten, die `actions/checkout` schon
+      # eingerichtet hat -- kein Token in einer Adresse, das in einem Protokoll
+      # landen koennte.
+      - name: Auf gh-pages veroeffentlichen
+        run: |
+          set -euo pipefail
+          touch webseite/out/.nojekyll
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Jedes Mal ein einzelner, frischer Commit. Der Branch ist erzeugter
+          # Inhalt -- eine Historie darauf waere nur Ballast, und ein fester
+          # Ausgangspunkt macht den Lauf wiederholbar.
+          git worktree add --detach /tmp/seite
+          git -C /tmp/seite checkout --orphan gh-pages
+          git -C /tmp/seite rm -rq --cached . || true
+          find /tmp/seite -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r webseite/out/. /tmp/seite/
+          cd /tmp/seite
+          git add -A
+          git commit -q -m "Website aus ${GITHUB_SHA:0:12}"
+          git push -q --force origin gh-pages
+          echo "Veroeffentlicht: https://pheonix-studio-cat.github.io/${GITHUB_REPOSITORY#*/}/"
