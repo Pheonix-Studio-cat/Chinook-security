@@ -1,4 +1,4 @@
-"""Das gemeinsame Befund-Format des Chinook-Oekosystems.
+"""Das gemeinsame Befund-Format des Chinook-Security-Oekosystems.
 
 Jeder Bot gibt dasselbe aus. Ohne dieses Format waere weder die
 Aufseher-Schicht noch die Website baubar: beide lesen Befunde, nicht

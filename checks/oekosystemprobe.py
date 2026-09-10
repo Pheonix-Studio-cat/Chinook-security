@@ -1,4 +1,4 @@
-"""Prueft, ob OSV die Oekosystem-Namen kennt, die Chinook schickt.
+"""Prueft, ob OSV die Oekosystem-Namen kennt, die Chinook Security schickt.
 
 Der Dependency-Bot schickt je Sperrdatei einen festen Namen mit: `PyPI`, `npm`,
 `Go`, `crates.io`, `Packagist`. Ist einer davon falsch geschrieben, findet OSV

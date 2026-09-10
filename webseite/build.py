@@ -1,4 +1,4 @@
-"""Baut die Chinook-Website -- eine einzige statische HTML-Datei.
+"""Baut die Chinook-Security-Website -- eine einzige statische HTML-Datei.
 
 **Die Seite wird erzeugt, nicht gepflegt.** Jede Regel, die hier steht, kommt
 aus dem Bot, der sie anwendet (`regeln()`). Eine von Hand gepflegte Liste
@@ -283,7 +283,7 @@ def baue(gegenprobe: dict | None = None) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chinook &mdash; security bots as GitHub Actions</title>
+<title>Chinook Security &mdash; bots as GitHub Actions</title>
 <meta name="description" content="Open-source security bots as GitHub Actions, with an AI layer that keeps the bots honest. Every check is counter-proved.">
 <style>{STIL}</style>
 </head>
@@ -291,7 +291,7 @@ def baue(gegenprobe: dict | None = None) -> str:
 <div class="huelle">
 
 <header>
-<h1>Chinook
+<h1>Chinook Security
 <span class="unter">Security bots as GitHub Actions &mdash; and an AI layer that keeps
 the bots honest. Open source, MIT, version {e(__version__)}.</span></h1>
 </header>
@@ -301,14 +301,14 @@ the bots honest. Open source, MIT, version {e(__version__)}.</span></h1>
 <div class="merksatz">
 <p>A security tool that runs green without checking anything is worse than none:
 it creates trust that carries nothing.</p>
-<p>That is why the <strong>counterproof</strong> is not an extra in Chinook but the
+<p>That is why the <strong>counterproof</strong> is not an extra in Chinook Security but the
 core &mdash; every rule is run against a deliberately broken case, and every check
 against a deliberately broken bot.</p>
 </div>
 
 <h2>Installing</h2>
 <p>Into the repository you want checked, as <code>.github/workflows/chinook.yml</code>:</p>
-<pre><code>name: Chinook
+<pre><code>name: Chinook Security
 on: [pull_request]
 
 permissions:
@@ -361,7 +361,7 @@ obedience is not one.</p>
 <tr><th>Property</th><th>Why</th></tr>
 <tr><td>It does not spend someone else&rsquo;s money</td>
 <td>The key comes from <code>CHINOOK_AI_TOKEN</code> in the repository of whoever runs
-it. Chinook holds none.</td></tr>
+it. Chinook Security holds none.</td></tr>
 <tr><td>It is optional</td>
 <td>Without a key everything else keeps running. A scanner that fails because a model
 did not answer is worse than none.</td></tr>
@@ -386,7 +386,7 @@ both read findings and not tool output.</p>
 hash, only rule and length. A prefix would be a leak for a password, a hash an oracle
 for a weak one, and in a public repository anyone can read the action log.</p>
 
-<h2>What Chinook does not promise</h2>
+<h2>What Chinook Security does not promise</h2>
 <ul>
 <li><strong>Completeness.</strong> No finding does not mean &bdquo;secure&ldquo;, it
 means &bdquo;these rules found nothing&ldquo;.</li>
@@ -401,7 +401,7 @@ is no measurement backing them.</li>
 &mdash; that file matters more than a feature list.</p>
 
 <footer>
-<p>Chinook &mdash; <a href="{REPO}">{REPO.replace("https://", "")}</a> &middot;
+<p>Chinook Security &mdash; <a href="{REPO}">{REPO.replace("https://", "")}</a> &middot;
 MIT &middot; PH&Ouml;NIX STUDIO.
 This page is generated from the source, not maintained by hand: every rule above
 comes from the bot that applies it.</p>
@@ -414,7 +414,7 @@ comes from the bot that applies it.</p>
 
 
 def main(argv=None) -> int:
-    zerleger = argparse.ArgumentParser(prog="webseite.build", description="Baut die Chinook-Website.")
+    zerleger = argparse.ArgumentParser(prog="webseite.build", description="Baut die Chinook-Security-Website.")
     zerleger.add_argument("--out", default=str(WURZEL / "webseite" / "out"), help="Ausgabeverzeichnis")
     zerleger.add_argument(
         "--gegenprobe", default="", help="JSON-Ergebnis von checks.counterproof"

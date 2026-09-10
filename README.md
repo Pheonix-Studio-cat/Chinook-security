@@ -1,11 +1,11 @@
-# Chinook
+# Chinook Security
 
 **Security bots as GitHub Actions — and an AI layer that keeps the bots
 honest.** Open source, MIT.
 
 A security tool that runs green without checking anything is worse than none:
 it creates trust that carries nothing. That is why the **counterproof** is not
-an extra in Chinook but the core — every rule is run against a deliberately
+an extra in Chinook Security but the core — every rule is run against a deliberately
 broken case, and every check is run against a deliberately broken bot. Whatever
 stays green is treated as worthless, and said so.
 
@@ -50,7 +50,7 @@ wants maintaining.
 Into the repository you want checked, as `.github/workflows/chinook.yml`:
 
 ```yaml
-name: Chinook
+name: Chinook Security
 on: [pull_request]
 
 permissions:
@@ -92,7 +92,7 @@ findings then stand unchanged. That is deliberate; see below.
 
 **Why composite actions and not reusable workflows?** A reusable workflow
 (`uses: …/secret-bot.yml@v1`) would be one line instead of four. But it would
-have to know which version of Chinook to fetch — and there is no usable value
+have to know which version of Chinook Security to fetch — and there is no usable value
 for that: `github.job_workflow_sha` was empty in all three cases tested (local
 call, full path within the same repository, call from a foreign repository).
 Without it, only a hard-wired ref would remain, which then no longer matches
@@ -194,7 +194,7 @@ for `requirements.txt` without `==`).
 > through, or the answer does not match the request, the run ends with exit
 > code **2** — not with a green tick. Whoever could not ask knows nothing.
 
-**Chinook does not rate severity itself.** Every known vulnerability is "high",
+**Chinook Security does not rate severity itself.** Every known vulnerability is "high",
 and the advisory IDs are in the finding. Deriving a number from a CVSS vector
 we never fetched would be an invented figure; rating is the overseer's job.
 
@@ -247,7 +247,7 @@ against a broken fixture is broken — and then it says so.
 
 | | |
 | --- | --- |
-| **It does not spend someone else's money** | The key comes from `CHINOOK_AI_TOKEN` in the repository of whoever runs it. Chinook holds none. |
+| **It does not spend someone else's money** | The key comes from `CHINOOK_AI_TOKEN` in the repository of whoever runs it. Chinook Security holds none. |
 | **It is optional** | Without a key everything else keeps running. A scanner that fails because a model did not answer is worse than none. |
 | **It has no tools and no write access** | It inevitably reads foreign text — paths from a fork, package names. A model with tools reading such text is prompt injection with write access. |
 
@@ -315,7 +315,7 @@ The page lives at `https://pheonix-studio-cat.github.io/Chinook-security/`.
 
 ## The weekly run
 
-Mondays: checks, counterproof and all five bots over Chinook's own repository,
+Mondays: checks, counterproof and all five bots over Chinook Security's own repository,
 without anyone having to commit anything. It catches what changes **without a
 commit** — a new advisory at OSV, a changed default in GitHub Actions, a tool
 that answers differently than last week.
@@ -368,7 +368,7 @@ repository is blocked by GitHub's push protection and reported by scanners.
 
 - **Tag `v1`**, so users can write `@v1` instead of `@main` or a commit SHA.
 - **The overseer has never run against a real model.** The checks run against a
-  stub — rightly so, what is checked is what Chinook does with the answer.
+  stub — rightly so, what is checked is what Chinook Security does with the answer.
   Whether a real model produces usable assessments is open.
 - **Licences of dependencies** for the licence bot — it currently sees only the
   repository itself, not what it pulls in.

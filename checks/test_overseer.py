@@ -1,7 +1,7 @@
 """Pruefungen fuer den Aufseher.
 
 Gefahren wird gegen einen Stub auf dem eigenen Rechner. Geprueft wird nicht das
-Modell -- geprueft wird, **was Chinook mit dessen Antwort macht**, und zwar
+Modell -- geprueft wird, **was Chinook Security mit dessen Antwort macht**, und zwar
 auch dann, wenn die Antwort boesartig ist.
 """
 

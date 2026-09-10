@@ -4,7 +4,7 @@ Drei Eigenschaften standen fest, bevor eine Zeile davon existierte, und sie
 sind der Grund, warum diese Datei so aussieht:
 
 1. **Er zahlt nicht auf ein fremdes Konto.** Der Schluessel kommt aus dem
-   Repo-Secret dessen, der ihn einsetzt (`CHINOOK_AI_TOKEN`). Chinook haelt
+   Repo-Secret dessen, der ihn einsetzt (`CHINOOK_AI_TOKEN`). Chinook Security haelt
    keinen.
 2. **Er ist freiwillig.** Ohne Schluessel laufen die Bots trotzdem. Ein
    Scanner, der ausfaellt, weil ein Modell nicht antwortet, ist schlechter als
@@ -57,7 +57,7 @@ class OverseerUnavailable(RuntimeError):
     """Die Anfrage ist nicht durchgekommen. Es gibt keine Einschaetzung."""
 
 
-SYSTEM = """You are the overseer of Chinook, a toolkit of security bots.
+SYSTEM = """You are the overseer of Chinook Security, a toolkit of security bots.
 
 You are given findings these bots produced in a repository. Your only job: rate
 each finding, so a human knows what to read first.
@@ -102,7 +102,7 @@ ANTWORT_SCHEMA = {
 
 
 def lade_berichte(pfade) -> list[dict]:
-    """Liest Befundberichte im Chinook-Format."""
+    """Liest Befundberichte im Chinook-Security-Format."""
     berichte = []
     for pfad in pfade:
         with open(pfad, "r", encoding="utf-8") as handle:

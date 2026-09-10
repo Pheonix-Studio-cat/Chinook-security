@@ -1,4 +1,4 @@
-name: "Chinook Workflow-Bot"
+name: "Chinook Security Workflow-Bot"
 description: >-
   Prueft die GitHub Actions des Repos selbst: ungepinnte Actions, zu weite
   Rechte, pull_request_target mit fremdem Checkout, Script Injection in run-Bloecken.

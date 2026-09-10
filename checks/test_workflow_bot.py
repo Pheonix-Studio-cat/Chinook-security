@@ -171,7 +171,7 @@ class EigenesRepoTest(unittest.TestCase):
         """Ohne Nachsicht: auch kein Hinweis.
 
         Seit die eigenen Actions auf Commits festgelegt sind, gibt es keinen
-        Grund mehr fuer eine Ausnahme. Was Chinook bei anderen anmahnt, haelt
+        Grund mehr fuer eine Ausnahme. Was Chinook Security bei anderen anmahnt, haelt
         es selbst -- und ein Rueckfall faellt hier auf.
         """
         treffer = [f"{f.path}:{f.line} {f.rule}" for f in run(str(WURZEL))]

@@ -1,6 +1,6 @@
 # Grenzen
 
-Was Chinook **nicht** kann. Diese Datei ist wichtiger als eine Merkmalsliste:
+Was Chinook Security **nicht** kann. Diese Datei ist wichtiger als eine Merkmalsliste:
 wer die Grenze nicht kennt, hält ein leeres Ergebnis für eine Unbedenklichkeits-
 bescheinigung.
 
@@ -77,7 +77,7 @@ gefunden. Die Regeln stehen vollständig in `chinook/secret_bot.py` und
 - **Die echte Adresse wird von den Pruefungen nicht angesprochen.** Sie fahren
   gegen einen Stub auf dem eigenen Rechner. In der Selbstpruefung gibt es dafuer
   den Job `netzprobe` — der **darf fehlschlagen**, weil er ueber einen fremden
-  Dienst Auskunft gibt und nicht ueber Chinook.
+  Dienst Auskunft gibt und nicht ueber Chinook Security.
 
 ## Code-Bot
 
@@ -136,7 +136,7 @@ gefunden. Die Regeln stehen vollständig in `chinook/secret_bot.py` und
 ## Website
 
 - **Sie zeigt den Stand einer Fassung, nicht den eines fremden Repos.** Die
-  Zahlen darauf gelten fuer Chinook selbst.
+  Zahlen darauf gelten fuer Chinook Security selbst.
 - **Der Stand der Gegenprobe stammt vom letzten Bau** -- bei jedem Merge auf
   `main` und einmal woechentlich. Was dazwischen passiert, steht nicht darauf.
 - **Kein Suchfeld, keine Navigation, kein Skript.** Eine Seite, eine Datei.

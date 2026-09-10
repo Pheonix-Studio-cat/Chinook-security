@@ -9,7 +9,7 @@ Vulnerability Reporting).
 Hilfreich in der Meldung: was betroffen ist, was ein Angreifer damit erreicht,
 und ein möglichst kleiner Fall, der es zeigt.
 
-## Was Chinook selbst verspricht
+## Was Chinook Security selbst verspricht
 
 | Zusage | Wie sie gehalten wird |
 | --- | --- |
@@ -22,12 +22,12 @@ und ein möglichst kleiner Fall, der es zeigt.
 | Der Lizenz-Bot behauptet keine Lizenz | `KeineRechtsaussageTest` in `checks/test_license_bot.py` |
 | **Kein Befund geht verloren** | der Aufseher baut seine Liste aus den Befunden, nie aus der Modellantwort; `KeinBefundGehtVerlorenTest` und fünf Mutationen |
 | Der Aufseher hat keine Werkzeuge und keine Schreibrechte | `test_der_aufseher_bekommt_keine_werkzeuge`; er stellt genau eine Anfrage und liest die Antwort |
-| Chinook hält keinen Modellschlüssel | der Schlüssel kommt aus `CHINOOK_AI_TOKEN` im Repo des Nutzers |
+| Chinook Security hält keinen Modellschlüssel | der Schlüssel kommt aus `CHINOOK_AI_TOKEN` im Repo des Nutzers |
 | Die Website lädt nichts nach | kein Stylesheet, keine Schrift, kein Skript von fremden Adressen; `KeineFremdenRessourcenTest` |
 | Die Website beschreibt, was die Bots wirklich tun | die Tabellen werden aus `regeln()` erzeugt; `KeineDriftTest` hält sie gegen die Regeln, die die Bots melden |
 | Die aufgerufene Fassung ist festgelegt | leeres `job_workflow_sha` bricht den Workflow ab, statt irgendeine Fassung zu holen |
 
-## Was Chinook **nicht** verspricht
+## Was Chinook Security **nicht** verspricht
 
 - **Vollständigkeit.** Die Bots finden, was ihre Regeln beschreiben. Kein
   Befund heißt nicht „sicher", es heißt „diese Regeln haben nichts gefunden".
@@ -38,7 +38,7 @@ und ein möglichst kleiner Fall, der es zeigt.
 - **Keine Erkennungsraten.** Es gibt hier keine Prozentzahlen, weil es keine
   Messung gibt, die sie belegt.
 - **Keine eigene Einstufung von Schwachstellen.** Jede bekannte Schwachstelle
-  ist „hoch". Chinook rechnet kein CVSS aus.
+  ist „hoch". Chinook Security rechnet kein CVSS aus.
 - **Keine Rechtsauskunft.** Der Lizenz-Bot meldet, was fehlt und was
   auseinandergeht. Was daraus folgt, entscheidet ein Mensch.
 - **Der Aufseher irrt.** Eine Einschätzung ist die Meinung eines Modells, kein

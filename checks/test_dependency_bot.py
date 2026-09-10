@@ -296,7 +296,7 @@ class UnerreichbarTest(unittest.TestCase):
                 query_osv(deps, url=stub.url, timeout=5)
 
     def test_unpassende_antwort_wirft(self):
-        # Zu wenige Ergebnisse: die Zuordnung waere verschoben, und Chinook
+        # Zu wenige Ergebnisse: die Zuordnung waere verschoben, und Chinook Security
         # wuerde eine Schwachstelle dem falschen Paket zuschreiben.
         with fixtures.OsvStub(antwort={"results": []}) as stub, tempfile.TemporaryDirectory() as ordner:
             deps = self._deps(ordner)

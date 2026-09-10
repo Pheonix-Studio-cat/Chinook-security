@@ -1,4 +1,4 @@
-name: "Chinook Dependency-Bot"
+name: "Chinook Security Dependency-Bot"
 description: >-
   Liest die Sperrdateien (requirements.txt, package-lock.json, go.mod) und fragt
   OSV.dev nach bekannten Schwachstellen. Kommt die Abfrage nicht durch, schlaegt der

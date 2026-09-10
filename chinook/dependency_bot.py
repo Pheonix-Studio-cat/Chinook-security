@@ -402,7 +402,7 @@ def to_findings(deps, treffer: dict[int, list[str]]) -> list[Finding]:
                 bot=BOT,
                 rule="known-vulnerability",
                 title="Dependency with a known vulnerability",
-                # Chinook stuft nicht selbst ein: jede bekannte Schwachstelle
+                # Chinook Security stuft nicht selbst ein: jede bekannte Schwachstelle
                 # ist "hoch". Das Einordnen ist Sache des Aufsehers, nicht eine
                 # Zahl, die wir uns ausdenken.
                 severity="high",
@@ -439,7 +439,7 @@ REGELN = (
         "schwere": "high",
         "was": (
             "According to OSV.dev at least one advisory affects this version. "
-            "Chinook does not rate severity itself -- every known vulnerability is "
+            "Chinook Security does not rate severity itself -- every known vulnerability is "
             "\u201ehigh\u201c, and rating is the overseer's job."
         ),
     },

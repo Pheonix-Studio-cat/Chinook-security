@@ -53,7 +53,7 @@ Dasselbe läuft in `.github/workflows/selfcheck.yml` bei jedem Pull Request.
 - **Eine Prüfung fährt nie gegen eine echte fremde Adresse.** Der
   Dependency-Bot wird gegen einen Stub auf dem eigenen Rechner gefahren; die
   echte Erreichbarkeit ist ein eigener Job, der fehlschlagen darf. Für den
-  Aufseher gilt dasselbe — geprüft wird nicht das Modell, sondern was Chinook
+  Aufseher gilt dasselbe — geprüft wird nicht das Modell, sondern was Chinook Security
   mit dessen Antwort macht.
 - **Jede neue Fähigkeit des Aufsehers braucht einen Angriff.** Was passiert,
   wenn die Antwort leer ist, wenn sie etwas erfindet, wenn sie eine Anweisung

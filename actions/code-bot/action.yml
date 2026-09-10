@@ -1,4 +1,4 @@
-name: "Chinook Code-Bot"
+name: "Chinook Security Code-Bot"
 description: >-
   Sucht Muster im Quelltext, die erfahrungsgemaess Loecher sind: ausgefuehrter Text,
   Shell-Aufrufe mit eingesetzten Werten, abgeschaltete TLS-Pruefung.

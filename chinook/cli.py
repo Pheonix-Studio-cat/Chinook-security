@@ -41,63 +41,63 @@ def _split(value: str) -> list[str]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="chinook",
-        description="Chinook -- Sicherheits-Bots fuer GitHub-Repos.",
+        description="Chinook Security -- security bots for GitHub repositories.",
     )
     parser.add_argument(
         "bot",
         choices=sorted([*BOTS, "overseer"]),
-        help="welcher Bot laufen soll (oder `overseer` zum Einordnen)",
+        help="which bot to run (or `overseer` to triage findings)",
     )
-    parser.add_argument("--path", default=".", help="Wurzel des zu pruefenden Repos")
-    parser.add_argument("--exclude", default="", help="Pfade, kommagetrennt")
+    parser.add_argument("--path", default=".", help="root of the repository to check")
+    parser.add_argument("--exclude", default="", help="paths to skip, comma-separated")
     parser.add_argument(
         "--history",
         action="store_true",
-        help="zusaetzlich die Git-History pruefen (nur secret-bot)",
+        help="also scan the git history (secret-bot only)",
     )
-    parser.add_argument("--json", dest="json_out", default="", help="Bericht als JSON")
-    parser.add_argument("--sarif", dest="sarif_out", default="", help="Bericht als SARIF")
+    parser.add_argument("--json", dest="json_out", default="", help="write the report as JSON to this file")
+    parser.add_argument("--sarif", dest="sarif_out", default="", help="write the report as SARIF to this file")
     parser.add_argument(
         "--osv-url",
         default=dependency_bot.OSV_URL,
-        help="Adresse der OSV-Abfrage (nur dependency-bot; fuer Pruefungen)",
+        help="OSV query URL (dependency-bot only; for tests)",
     )
     parser.add_argument(
         "--osv-timeout",
         type=int,
         default=dependency_bot.TIMEOUT,
-        help="Zeitgrenze der OSV-Abfrage in Sekunden (nur dependency-bot)",
+        help="OSV query timeout in seconds (dependency-bot only)",
     )
     parser.add_argument(
         "--report",
         dest="reports",
         action="append",
         default=[],
-        help="Befundbericht, den der Aufseher einordnen soll (mehrfach moeglich)",
+        help="a finding report for the overseer to triage (repeatable)",
     )
     parser.add_argument(
         "--api-url",
         default=overseer.API_URL,
-        help="Adresse der Messages-API (nur overseer; fuer Pruefungen)",
+        help="Messages API URL (overseer only; for tests)",
     )
     parser.add_argument(
-        "--model", default=overseer.MODEL, help="Modell fuer den Aufseher"
+        "--model", default=overseer.MODEL, help="model for the overseer"
     )
     parser.add_argument(
         "--require",
         action="store_true",
-        help="den Lauf mit 2 beenden, wenn der Aufseher nicht laufen konnte",
+        help="exit with 2 if the overseer could not run",
     )
     parser.add_argument(
         "--no-fallbacks",
         action="store_true",
-        help="ohne serverseitigen Modell-Rueckfall anfragen (nur overseer)",
+        help="ask without server-side model fallback (overseer only)",
     )
     parser.add_argument(
         "--fail-on",
         default="high",
         choices=(*fmt.SEVERITIES, "never"),
-        help="ab welchem Schweregrad der Lauf fehlschlaegt (Standard: high)",
+        help="severity at which the run fails (default: high)",
     )
     return parser
 

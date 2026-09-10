@@ -1,4 +1,4 @@
-name: "Chinook Aufseher"
+name: "Chinook Security Aufseher"
 description: >-
   Ordnet die Befunde der Bots ein: was ist echt, was ist Rauschen, was ist
   unklar. Er entfernt nichts und aendert keinen Schweregrad -- er haengt eine
@@ -44,7 +44,7 @@ runs:
       #   env:
       #     CHINOOK_AI_TOKEN: ${{ secrets.CHINOOK_AI_TOKEN }}
       #
-      # Chinook haelt keinen Schluessel. Jeder Aufruf rechnet auf das Konto
+      # Chinook Security haelt keinen Schluessel. Jeder Aufruf rechnet auf das Konto
       # dessen ab, der ihn einsetzt.
       env:
         CHINOOK_REPORTS: ${{ inputs.reports }}
