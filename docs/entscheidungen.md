@@ -118,6 +118,40 @@ Bot meldete sich prompt selbst — sieben Treffer in der eigenen Regeltabelle.
 
 ---
 
+## Veroeffentlicht wird ueber `gh-pages`, nicht ueber `actions/deploy-pages`
+
+Der erste Entwurf benutzte `actions/upload-pages-artifact` und
+`actions/deploy-pages`. Das setzt voraus, dass im Repo unter *Settings → Pages*
+als Quelle **GitHub Actions** eingestellt ist — und genau das war es nicht. Zwei
+Läufe scheiterten deshalb an derselben Stelle: `bauen` grün,
+`veroeffentlichen` rot.
+
+Die Einstellung liess sich aus dieser Sitzung nicht setzen; der Proxy lässt den
+Pages-Pfad der GitHub-API nicht durch (`HTTP 403`), und das Token hat keine
+Verwaltungsrechte. Beides gemessen, nicht vermutet.
+
+**Was stattdessen funktioniert hat:** einen Branch `gh-pages` anlegen und
+pushen. GitHub hat Pages daraufhin **von selbst aktiviert** — `has_pages` sprang
+von `false` auf `true`, festgestellt über die Repo-API vor und nach dem Push.
+
+Der Workflow benutzt jetzt diesen Weg. Er hängt damit an keiner Einstellung, die
+jemand vergessen oder umstellen kann, und er braucht keine der beiden
+Pages-Actions.
+
+Jeder Lauf schreibt **einen einzelnen Commit ohne Vorgeschichte** und setzt den
+Branch mit `--force`: der Inhalt ist erzeugt, eine Historie darauf wäre Ballast,
+und ein fester Ausgangspunkt macht den Lauf wiederholbar. Gepusht wird über die
+Zugangsdaten, die `actions/checkout` bereits eingerichtet hat — kein Token in
+einer Adresse, die in einem Protokoll landen könnte. Nur dieser eine Job
+bekommt `contents: write`.
+
+**Was das über den ersten Entwurf sagt:** die Bauart war nicht falsch, aber sie
+verlagerte eine Voraussetzung in eine Einstellung, die im Repo unsichtbar ist.
+Dieselbe Lehre wie bei den aufrufbaren Workflows — was nicht im Repo steht,
+kann das Repo nicht sicherstellen.
+
+---
+
 ## Die Website wird erzeugt, nicht gepflegt
 
 Jede Regel auf der Seite kommt aus `regeln()` des Bots, der sie anwendet. Es

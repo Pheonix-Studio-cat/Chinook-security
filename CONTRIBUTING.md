@@ -76,3 +76,9 @@ Dasselbe läuft in `.github/workflows/selfcheck.yml` bei jedem Pull Request.
 
 Deutsch in Dokumentation, Kommentaren und Commit-Meldungen. Bezeichner im Code
 bleiben englisch.
+
+**Eine Ausnahme: `README.md` ist englisch.** Sie ist die Eingangstür des
+Projekts — wer die Bots einsetzt, soll sie lesen können, ohne Deutsch zu
+können. Alles dahinter (`docs/`, `SECURITY.md`, diese Datei) bleibt deutsch.
+Wer die README ändert, ändert sie auf Englisch; wer sie „zurückübersetzt",
+nimmt dem Projekt seine Reichweite.

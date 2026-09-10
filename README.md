@@ -1,48 +1,51 @@
 # Chinook
 
-**Sicherheits-Bots als GitHub Actions — und eine KI-Schicht, die die Bots
-kontrolliert.** Open Source, MIT.
+**Security bots as GitHub Actions — and an AI layer that keeps the bots
+honest.** Open source, MIT.
 
-Ein Sicherheitswerkzeug, das grün läuft, ohne etwas zu prüfen, ist schlimmer
-als keins: es erzeugt Vertrauen, das nichts trägt. Deshalb ist in Chinook die
-**Gegenprobe** kein Zusatz, sondern der Kern — jede Regel wird gegen einen
-absichtlich kaputten Fall gefahren, und jede Prüfung wird gegen einen
-absichtlich kaputten Bot gefahren. Was dabei grün bleibt, gilt als wertlos und
-wird gemeldet.
+A security tool that runs green without checking anything is worse than none:
+it creates trust that carries nothing. That is why the **counterproof** is not
+an extra in Chinook but the core — every rule is run against a deliberately
+broken case, and every check is run against a deliberately broken bot. Whatever
+stays green is treated as worthless, and said so.
+
+> **The documentation is German.** `docs/`, the code comments and the commit
+> messages are written in German, because that is the project owner's language.
+> This README is English so the tool can be used without it.
 
 ---
 
-## Stand
+## Status
 
-**Alle fünf Etappen sind gebaut:** das gemeinsame Befund-Format, fünf Bots, die
-Gegenprobe, je eine composite action pro Bot, der **Aufseher**, der die Befunde
-einordnet und die Bots kontrolliert, die **Website** und der **Wochenlauf**.
+**All five stages are built:** the shared finding format, five bots, the
+counterproof, one composite action per bot, the **overseer** that triages the
+findings and keeps the bots honest, the **website** and the **weekly run**.
 
-| Teil | Zustand |
+| Part | State |
 | --- | --- |
-| Befund-Format (JSON + SARIF) | ✅ `chinook/findings.py`, `schema/finding.schema.json` |
-| **Secret-Bot** | ✅ Arbeitsbaum und Git-History |
-| **Workflow-Bot** | ✅ die Actions selbst |
-| **Dependency-Bot** | ✅ Sperrdateien gegen OSV.dev |
-| **Code-Bot** | ✅ 12 Muster in Python, JavaScript, Shell |
-| **Lizenz-Bot** | ✅ was fehlt und was auseinandergeht |
-| Composite Action je Bot | ✅ auch aus fremden Repos nachgewiesen |
-| **Aufseher** (KI-Schicht) | ✅ ordnet ein, entfernt nie |
-| Gegenprobe | ✅ 25 Mutationen, alle gefangen |
-| **Website** | ✅ aus dem Quelltext erzeugt, GitHub Pages |
-| **Wochenlauf** | ✅ montags, auch ohne Commit |
+| Finding format (JSON + SARIF) | ✅ `chinook/findings.py`, `schema/finding.schema.json` |
+| **Secret bot** | ✅ working tree and git history |
+| **Workflow bot** | ✅ the Actions themselves |
+| **Dependency bot** | ✅ lockfiles against OSV.dev |
+| **Code bot** | ✅ 12 patterns in Python, JavaScript, shell |
+| **Licence bot** | ✅ what is missing and what disagrees |
+| Composite action per bot | ✅ proven from a foreign repository too |
+| **Overseer** (AI layer) | ✅ triages, never removes |
+| Counterproof | ✅ 31 mutations, all caught |
+| **Website** | ✅ generated from the source, GitHub Pages |
+| **Weekly run** | ✅ Mondays, without a commit |
 
-**146 Prüfungen, alle grün. 25 Mutationen, alle gefangen.**
+**162 checks, all green. 31 mutations, all caught.**
 
-**Keine Abhängigkeiten.** Nur die Python-Standardbibliothek. Ein
-Sicherheitswerkzeug mit dreihundert transitiven Paketen ist selbst eine
-Angriffsfläche, und ein Lockfile will gepflegt werden.
+**No dependencies.** The Python standard library only. A security tool with
+three hundred transitive packages is an attack surface itself, and a lockfile
+wants maintaining.
 
 ---
 
-## Einbauen
+## Installing
 
-In das zu prüfende Repo, als `.github/workflows/chinook.yml`:
+Into the repository you want checked, as `.github/workflows/chinook.yml`:
 
 ```yaml
 name: Chinook
@@ -52,12 +55,12 @@ permissions:
   contents: read
 
 jobs:
-  sicherheit:
+  security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # nur nötig für die History-Prüfung
+          fetch-depth: 0          # only needed for the history check
 
       - uses: Pheonix-Studio-cat/Chinook-security/actions/secret-bot@main
         with:
@@ -68,7 +71,7 @@ jobs:
       - uses: Pheonix-Studio-cat/Chinook-security/actions/license-bot@main
 ```
 
-Der **Aufseher** kommt als eigener Schritt dazu, wenn man ihn will:
+The **overseer** is a separate step, if you want it:
 
 ```yaml
       - uses: Pheonix-Studio-cat/Chinook-security/actions/overseer@main
@@ -78,301 +81,301 @@ Der **Aufseher** kommt als eigener Schritt dazu, wenn man ihn will:
           reports: chinook-secret-bot.json,chinook-code-bot.json
 ```
 
-Ohne das Secret wird er **übersprungen**, und der Lauf bleibt grün — die
-Befunde der Bots stehen dann unverändert da. Das ist Absicht, siehe unten.
+Without the secret it is **skipped** and the run stays green — the bots'
+findings then stand unchanged. That is deliberate; see below.
 
-> ⚠️ `@main` ist zum Ausprobieren. Für den Dauerbetrieb auf einen Commit-SHA
-> festlegen — genau das, was der Workflow-Bot bei jeder anderen Action
-> anmahnt. Sobald es einen `v1`-Tag gibt, steht er hier.
+> ⚠️ `@main` is for trying it out. For day-to-day use, pin a commit SHA —
+> exactly what the workflow bot demands of every other action. Once there is a
+> `v1` tag it will be named here.
 
-**Warum composite actions und keine aufrufbaren Workflows?** Ein aufrufbarer
-Workflow (`uses: …/secret-bot.yml@v1`) wäre eine Zeile statt vier. Er müsste
-aber wissen, welche Fassung von Chinook er nachladen soll — und dafür gibt es
-keinen brauchbaren Wert: `github.job_workflow_sha` war in allen drei geprüften
-Fällen leer (lokaler Aufruf, Aufruf über den vollen Pfad im selben Repo, Aufruf
-aus einem fremden Repo). Ohne den Wert bliebe nur ein fest verdrahteter Ref,
-der dann nicht mehr dem `@…` des Aufrufers entspricht: der Bot käme aus einer
-anderen Fassung, als der Nutzer festgelegt hat, und niemand würde es merken.
+**Why composite actions and not reusable workflows?** A reusable workflow
+(`uses: …/secret-bot.yml@v1`) would be one line instead of four. But it would
+have to know which version of Chinook to fetch — and there is no usable value
+for that: `github.job_workflow_sha` was empty in all three cases tested (local
+call, full path within the same repository, call from a foreign repository).
+Without it, only a hard-wired ref would remain, which then no longer matches
+the caller's `@…`: the bot would come from a different version than the user
+pinned, and nobody would notice.
 
-Eine composite action hat das Problem nicht. Sie findet ihren eigenen Quelltext
-über `github.action_path`, und der liegt in **genau** der Fassung hinter dem
-`@`. Vier Zeilen mehr, dafür stimmt die Fassung. Nachgewiesen: das
-Gedächtnis-Repo des Projektinhabers bindet den Secret-Bot so ein, aus einem
-anderen — und privaten — Repo heraus.
+A composite action does not have that problem. It finds its own source through
+`github.action_path`, and that source is in **exactly** the version behind the
+`@`. Four more lines, and the version is right. Proven: the project owner's
+memory repository embeds the secret bot this way, from another — and private —
+repository.
 
-### Rückgabewerte
+### Exit codes
 
-| Wert | Bedeutung |
+| Value | Meaning |
 | --- | --- |
-| `0` | nichts gefunden, das die Schwelle erreicht |
-| `1` | Befunde ab der Schwelle |
-| `2` | **der Lauf konnte nichts feststellen** — z. B. OSV war nicht erreichbar |
+| `0` | nothing found that reaches the threshold |
+| `1` | findings at or above the threshold |
+| `2` | **the run could not determine anything** — e.g. OSV was unreachable |
 
-Die `2` ist der Grund, warum es sie gibt: ein Abruf, der nicht durchkam, ist
-kein leeres Ergebnis. Er gilt nicht als bestanden.
+The `2` is the reason it exists: a request that did not get through is not an
+empty result. It does not count as passing.
 
-### Die Bots einzeln
+### Inputs
 
-| Eingabe | Bedeutung |
+| Input | Meaning |
 | --- | --- |
-| `path` | Wurzel des zu prüfenden Verzeichnisses (Standard `.`) |
-| `exclude` | Pfade, kommagetrennt |
-| `history` | **nur Secret-Bot:** auch die Git-History prüfen, braucht `fetch-depth: 0` |
-| `fail-on` | ab welchem Schweregrad der Schritt fehlschlägt (Standard `high`, Lizenz-Bot `medium`) |
-| `report` | Pfad des JSON-Berichts |
-| `sarif` | Pfad des SARIF-Berichts, leer = keiner |
+| `path` | root of the directory to check (default `.`) |
+| `exclude` | paths, comma-separated |
+| `history` | **secret bot only:** also check the git history, needs `fetch-depth: 0` |
+| `fail-on` | severity at which the step fails (default `high`, licence bot `medium`) |
+| `report` | path of the JSON report |
+| `sarif` | path of the SARIF report, empty = none |
 
-Jeder Bot gibt `report` und `total` als Output zurück.
+Every bot returns `report` and `total` as outputs.
 
-Wer die Befunde in GitHubs Security-Ansicht sehen will, lädt die SARIF-Datei
-mit `github/codeql-action/upload-sarif` hoch. Das braucht
-`security-events: write` — dieses Recht gehört **in den einzelnen Job**, nicht
-an den Anfang der Datei.
+To see the findings in GitHub's security view, upload the SARIF file with
+`github/codeql-action/upload-sarif`. That needs `security-events: write` — a
+permission that belongs **in the individual job**, not at the top of the file.
 
 ---
 
-## Was die Bots finden
+## What the bots find
 
-### Secret-Bot
+### Secret bot
 
-Neun Regeln: AWS Access Key ID, GitHub-Token, Hugging-Face-Token, Anthropic-,
-OpenAI-, Slack- und Google-Schlüssel, private Schlüsselblöcke, und Zugangsdaten,
-die einer Variablen zugewiesen werden. Die letzte Regel läuft mit mittlerer
-Zuversicht und lässt erkennbare Platzhalter (`changeme`, `${VAR}`,
-`your-key-here`) durch.
+Nine rules: AWS access key ID, GitHub token, Hugging Face token, Anthropic,
+OpenAI, Slack and Google keys, private key blocks, and credentials assigned to
+a variable. The last rule runs at medium confidence and lets recognisable
+placeholders through (`changeme`, `${VAR}`, `your-key-here`).
 
-**Er prüft auch die History.** Ein Geheimnis, das in einem alten Commit steht,
-ist nicht weg, nur weil die aktuelle Datei sauber ist — und genau das lässt ein
-reiner Diff-Scan durch.
+**It checks the history too.** A secret sitting in an old commit is not gone
+just because the current file is clean — and that is exactly what a diff-only
+scan misses.
 
-> 🔒 **Ein Befund enthält nie den Fund.** Gemeldet werden Regel, Ort und Länge,
-> sonst nichts — kein Präfix, kein Hash. Bei einem öffentlichen Repo liest jeder
-> das Action-Log; ein Secret-Bot, der den gefundenen Schlüssel ausdruckt, wäre
-> selbst das Leck. Eine Prüfung hält das fest, und die Gegenprobe zeigt, dass
-> sie anschlägt, wenn die Redaktion abgeschaltet wird.
+> 🔒 **A finding never contains the find.** Reported are rule, location and
+> length, nothing else — no prefix, no hash. In a public repository anyone can
+> read the action log; a secret bot that prints the key it found would be the
+> leak itself. A check holds this, and the counterproof shows that the check
+> fires when redaction is switched off.
 
-### Workflow-Bot
+### Workflow bot
 
-| Regel | Schwere | Was sie bedeutet |
+| Rule | Severity | What it means |
 | --- | --- | --- |
-| `pull-request-target-checkout` | kritisch | `pull_request_target` läuft mit den Secrets des Ziel-Repos. Wer darin den PR-Kopf auscheckt, führt fremden Code mit diesen Secrets aus. |
-| `script-injection` | hoch | Ein Titel oder Kommentar wird vor der Ausführung in ein `run:`- oder `script:`-Skript eingesetzt. Ein Backtick darin ist dann ein Befehl. |
-| `permissions-write-all` | hoch | Jeder Schritt erbt alle Schreibrechte, auch eine Fremd-Action. |
-| `unpinned-action` | mittel (bei `actions/*`: Hinweis) | Ein Tag lässt sich verschieben. Dann ändert sich, was hier mit den Rechten dieses Repos läuft. |
-| `permissions-missing` | mittel | Ohne `permissions:` gelten die Standardrechte des Repos — an anderer Stelle eingestellt, änderbar, ohne dass diese Datei sich ändert. |
+| `pull-request-target-checkout` | critical | `pull_request_target` runs with the target repository's secrets. Checking out the PR head inside it runs foreign code with those secrets. |
+| `script-injection` | high | A title or comment is substituted into a `run:` or `script:` block before execution. A backtick in it is then a command. |
+| `permissions-write-all` | high | Every step inherits all write permissions, a third-party action included. |
+| `unpinned-action` | medium (`actions/*`: info) | A tag can be moved. Then what runs here with this repository's permissions changes. |
+| `permissions-missing` | medium | Without `permissions:` the repository defaults apply — configured elsewhere, changeable without this file changing. |
 
-**Bewusst zeilenbasiert, ohne YAML-Parser** — das ist der Preis dafür, keine
-Abhängigkeit zu haben. Für Anker und mehrzeilige Flow-Maps ist das zu grob; das
-steht so auch in `docs/`, statt verschwiegen zu werden.
+**Deliberately line-based, no YAML parser** — that is the price of having no
+dependencies. It is too coarse for anchors and multi-line flow maps; that is
+written down in `docs/`, not hidden.
 
-### Dependency-Bot
+### Dependency bot
 
-Liest die **Sperrdateien**, nicht die Wunschlisten. Was er findet, fragt er bei
-**OSV.dev** an — der offenen Schwachstellendatenbank, ohne Schlüssel und ohne
-Anmeldung.
+Reads the **lockfiles**, not the wish lists. Whatever it finds it asks
+**OSV.dev** about — the open vulnerability database, no key and no sign-up.
 
-| Datei | Ökosystem |
+| File | Ecosystem |
 | --- | --- |
-| `requirements.txt` (nur `==`), `poetry.lock` | PyPI |
-| `package-lock.json` (Format 1 wie 2/3), `yarn.lock` (v1 und Berry), `pnpm-lock.yaml` | npm |
+| `requirements.txt` (only `==`), `poetry.lock` | PyPI |
+| `package-lock.json` (format 1 as well as 2/3), `yarn.lock` (v1 and Berry), `pnpm-lock.yaml` | npm |
 | `go.mod` | Go |
 | `Cargo.lock` | crates.io |
 | `composer.lock` | Packagist |
 
-Ein falsch geschriebener Ökosystem-Name fände **nichts** — und nichts sähe aus
-wie „sauber". Deshalb prüft `checks/oekosystemprobe.py` in der Selbstprüfung
-gegen den echten Dienst, ob OSV die Namen kennt. Sie arbeitet im Unterschied:
-erst fragt sie mit einem erfundenen Ökosystem; erst wenn OSV *das* zurückweist,
-ist „nicht zurückgewiesen" ein Beleg.
+A misspelled ecosystem name would find **nothing** — and nothing looks like
+"clean". So `checks/oekosystemprobe.py` asks the real service, during the
+self-check, whether OSV knows the names. It works by difference: first it asks
+with an invented ecosystem; only if OSV *rejects* that is "not rejected"
+evidence.
 
-Zwei Regeln: `known-vulnerability` (hoch) und `dependency-unpinned` (niedrig,
-nur bei `requirements.txt` ohne `==`).
+Two rules: `known-vulnerability` (high) and `dependency-unpinned` (low, only
+for `requirements.txt` without `==`).
 
-> 🔴 **Ein fehlgeschlagener Abruf ist kein leeres Ergebnis.** Kommt die Abfrage
-> nicht durch, oder passt die Antwort nicht zur Anfrage, endet der Lauf mit
-> Rückgabewert **2** — nicht mit einem grünen Haken. Wer nicht fragen konnte,
-> weiß nichts.
+> 🔴 **A failed request is not an empty result.** If the query does not get
+> through, or the answer does not match the request, the run ends with exit
+> code **2** — not with a green tick. Whoever could not ask knows nothing.
 
-**Chinook stuft nicht selbst ein.** Jede bekannte Schwachstelle ist „hoch", und
-im Befund stehen die Advisory-Kennungen. Eine Zahl aus einem CVSS-Vektor
-abzuleiten, den wir nicht geholt haben, wäre eine erfundene Angabe; das
-Einordnen ist Aufgabe des Aufsehers (Etappe 3).
+**Chinook does not rate severity itself.** Every known vulnerability is "high",
+and the advisory IDs are in the finding. Deriving a number from a CVSS vector
+we never fetched would be an invented figure; rating is the overseer's job.
 
-### Code-Bot
+### Code bot
 
-Zwölf Muster, nach Dateiendung getrennt:
+Twelve patterns, separated by file extension:
 
-| Sprache | Was gesucht wird |
+| Language | What is looked for |
 | --- | --- |
-| Python | ausgeführter Text (`eval`/`exec`), Shell-Aufrufe mit eingesetzten Werten, `pickle`, unsicheres YAML, abgeschaltete TLS-Prüfung, `mktemp` |
-| JavaScript / TypeScript | ausgeführter Text, `exec` mit zusammengesetztem Befehl, `innerHTML`, abgeschaltete TLS-Prüfung |
-| Shell | Heruntergeladenes direkt ausführen (`curl …` in eine Shell gepipet), `eval` |
+| Python | executed text (`eval`/`exec`), shell calls with substituted values, `pickle`, unsafe YAML, disabled TLS verification, `mktemp` |
+| JavaScript / TypeScript | executed text, `exec` with an assembled command, `innerHTML`, disabled TLS verification |
+| Shell | running what was downloaded (`curl …` piped into a shell), `eval` |
 
-Musterbasiert, **ohne Datenflussanalyse**: er sieht, *dass* eine gefährliche
-Stelle da ist, nicht *ob* an ihr etwas Fremdes ankommt. Regeln mit mittlerer
-Zuversicht sind entsprechend gekennzeichnet.
+Pattern-based, **without data flow analysis**: it sees *that* a dangerous spot
+is there, not *whether* something foreign arrives at it. Rules at medium
+confidence are marked as such.
 
-### Lizenz-Bot
+### Licence bot
 
-| Regel | Schwere | Was sie bedeutet |
+| Rule | Severity | What it means |
 | --- | --- | --- |
-| `license-file-missing` | mittel | keine Lizenzdatei im Wurzelverzeichnis |
-| `license-undeclared` | mittel | `package.json` oder `pyproject.toml` ohne Lizenzangabe |
-| `license-link-broken` | mittel | die Angabe verweist auf eine Datei, die es nicht gibt |
-| `license-mismatch` | mittel | Erklärung und beiliegender Text gehen auseinander |
-| `license-unrecognised` | Hinweis | keine bekannte SPDX-Kennung — *License status requires verification* |
+| `license-file-missing` | medium | no licence file in the root directory |
+| `license-undeclared` | medium | `package.json` or `pyproject.toml` without a licence field |
+| `license-link-broken` | medium | the declaration points at a file that does not exist |
+| `license-mismatch` | medium | declaration and the accompanying text disagree |
+| `license-unrecognised` | info | not a known SPDX identifier — *License status requires verification* |
 
-> ⚖️ **Er stellt keine Rechtstatsache fest.** Er sagt nie, unter welcher Lizenz
-> etwas steht — nur was erklärt ist, was fehlt und was auseinandergeht. Alles
-> Weitere ist eine Frage an einen Menschen. Eine Prüfung hält fest, dass kein
-> Befund eine Lizenz behauptet.
+> ⚖️ **It states no legal fact.** It never says which licence something is
+> under — only what is declared, what is missing and what disagrees. Everything
+> beyond that is a question for a human. A check holds that no finding claims a
+> licence.
 
 ---
 
-## Der Aufseher
+## The overseer
 
-Die KI-Schicht. Sie hat zwei Aufgaben, und die zweite ist die eigentliche.
+The AI layer. It has two jobs, and the second is the real one.
 
-**Befunde einordnen.** Zu jedem Befund eine von vier Einschätzungen —
-`bestaetigt`, `vermutlich-echt`, `vermutlich-rauschen`, `unklar` — plus ein, zwei
-Sätze Begründung. Ohne Triage erstickt jeder Scanner-Rollout an Falschmeldungen.
+**Triage the findings.** One of four assessments per finding — `bestaetigt`
+(confirmed), `vermutlich-echt` (probably real), `vermutlich-rauschen` (probably
+noise), `unklar` (unclear) — plus a sentence or two of reasoning. Without
+triage every scanner rollout suffocates in false positives.
 
-**Die Bots kontrollieren.** `python3 -m checks.counterproof --json …` schreibt
-das Ergebnis der Gegenprobe maschinenlesbar: welcher Bot absichtlich kaputt
-gemacht wurde, und ob die Prüfungen daraufhin rot wurden. Ein Bot, der gegen ein
-kaputtes Fixture grün bleibt, ist kaputt — und das steht dann da.
+**Keep the bots honest.** `python3 -m checks.counterproof --json …` writes the
+counterproof result in machine-readable form: which bot was deliberately
+broken, and whether the checks went red as a result. A bot that stays green
+against a broken fixture is broken — and then it says so.
 
-### Drei Eigenschaften, die feststanden, bevor eine Zeile davon existierte
+### Three properties fixed before a line of it existed
 
 | | |
 | --- | --- |
-| **Er zahlt nicht auf ein fremdes Konto** | Der Schlüssel kommt aus `CHINOOK_AI_TOKEN` im Repo dessen, der ihn einsetzt. Chinook hält keinen. |
-| **Er ist freiwillig** | Ohne Schlüssel läuft alles andere weiter. Ein Scanner, der ausfällt, weil ein Modell nicht antwortet, ist schlechter als keiner. |
-| **Er hat keine Werkzeuge und keine Schreibrechte** | Er liest zwangsläufig fremden Text — Pfade aus einem Fork, Paketnamen. Ein Modell mit Werkzeugen, das solchen Text liest, ist Prompt Injection mit Schreibzugriff. |
+| **It does not spend someone else's money** | The key comes from `CHINOOK_AI_TOKEN` in the repository of whoever runs it. Chinook holds none. |
+| **It is optional** | Without a key everything else keeps running. A scanner that fails because a model did not answer is worse than none. |
+| **It has no tools and no write access** | It inevitably reads foreign text — paths from a fork, package names. A model with tools reading such text is prompt injection with write access. |
 
-### Und die Zusicherung, an der alles hängt
+### And the guarantee everything hangs on
 
-> 🔒 **Kein Befund geht verloren.** Die Antwort des Modells kann nur ein Feld
-> `triage` an einen Befund hängen. Sie kann keinen entfernen, keinen
-> Schweregrad ändern und keinen erfinden.
+> 🔒 **No finding gets lost.** The model's answer can only attach a `triage`
+> field to a finding. It cannot remove one, change a severity, or invent one.
 
-Technisch: die Ergebnisliste wird aus den **Befunden** aufgebaut, nie aus der
-Antwort. Was das Modell zu einem unbekannten Fingerabdruck sagt, fällt weg; eine
-Einschätzung außerhalb der vier erlaubten fällt weg; die Begründung wird von
-Steuerzeichen befreit und gekürzt. Sechs Prüfungen fahren genau diese Angriffe,
-und fünf Mutationen halten sie fest.
+Technically: the result list is built from the **findings**, never from the
+answer. Whatever the model says about an unknown fingerprint is dropped; an
+assessment outside the four allowed ones is dropped; the reasoning is stripped
+of control characters and truncated. Six checks run exactly these attacks, and
+five mutations hold them.
 
-Wegräumen bleibt eine Menschenentscheidung.
+Clearing findings away stays a human decision.
 
-### Wenn er nicht laufen kann
+### When it cannot run
 
-| Fall | Was passiert |
+| Case | What happens |
 | --- | --- |
-| kein Schlüssel | `uebersprungen`, Rückgabewert `0` |
-| Anfrage scheitert / Modell lehnt ab | `fehlgeschlagen`, Rückgabewert `0` |
-| dasselbe mit `--require` | Rückgabewert `2` |
+| no key | `uebersprungen` (skipped), exit code `0` |
+| request fails / model declines | `fehlgeschlagen` (failed), exit code `0` |
+| the same with `--require` | exit code `2` |
 
-Warum hier `0` und nicht `2` wie beim Dependency-Bot? Weil der Aufseher **kein
-Urteil fällt**. Die Bots haben ihres schon gefällt, und ihre Befunde stehen
-unverändert im Bericht. Wer ohne Einordnung nicht weitermachen will, nimmt
+Why `0` here and not `2` like the dependency bot? Because the overseer **passes
+no judgement**. The bots have already passed theirs, and their findings stand
+unchanged in the report. Whoever will not proceed without triage uses
 `--require`.
 
-Der Aufruf geht an die Anthropic-Messages-API, Standardmodell `claude-opus-5`.
-Anderes Modell mit `--model`; andere Adresse mit `--api-url`. Andere Anbieter
-sprechen eine andere Request-Form — das steht in `docs/grenzen.md`.
+The call goes to the Anthropic Messages API, default model `claude-opus-5`.
+Another model with `--model`; another address with `--api-url`. Other providers
+speak a different request shape — that is in `docs/grenzen.md`.
 
 ---
 
-## Die Website
+## The website
 
-Statisch, eine einzige HTML-Datei, **aus dem Quelltext erzeugt**:
+Static, a single HTML file, **generated from the source**:
 
 ```
 python3 -m webseite.build --gegenprobe chinook-gegenprobe.json
 ```
 
-Jede Regel, die auf der Seite steht, kommt aus dem Bot, der sie anwendet
-(`regeln()`). Eine von Hand gepflegte Liste würde driften, und die Seite
-behauptete dann etwas, das kein Bot tut. Eine Prüfung hält fest, dass jede
-Regel auf der Seite steht — und eine zweite, dass die Regeltabellen **genau**
-den Regeln entsprechen, die die Bots gegen ihre Fixtures melden.
+Every rule on the page comes from the bot that applies it (`regeln()`). A
+hand-maintained list would drift, and the page would then describe something no
+bot does. One check holds that every rule is on the page — and a second that
+the rule tables match **exactly** the rules the bots report against their
+fixtures.
 
-Die Seite lädt **nichts nach**: kein Stylesheet, keine Schrift, kein Skript von
-woanders. Eine Seite, die ein Sicherheitswerkzeug beschreibt, holt keinen Code
-von fremden Adressen. Auch das ist geprüft.
+The page **loads nothing**: no stylesheet, no font, no script from anywhere
+else. A page describing a security tool does not fetch code from foreign
+addresses. That is checked too.
 
-Und sie zeigt den **Stand der Gegenprobe** — welche Mutation gefangen wurde und
-welche nicht. Liegt kein Ergebnis vor, sagt sie das, statt etwas zu behaupten.
-Der Bau läuft bei jedem Merge auf `main` und einmal wöchentlich.
+And it shows the **state of the counterproof** — which mutation was caught and
+which was not. If no result is available it says so instead of claiming
+something. The build runs on every merge to `main` and once a week.
 
-## Der Wochenlauf
+Publishing goes through the **`gh-pages`** branch, not through
+`actions/deploy-pages`: that would have required a repository setting nobody
+can see in the source. Creating the branch, on the other hand, made GitHub
+Pages activate on its own. Each run writes a single commit with no history —
+the branch is generated content, not a place to edit.
 
-Montags: Prüfungen, Gegenprobe und alle fünf Bots über das eigene Repo, ohne
-dass jemand etwas committen muss. Er fängt, was sich **ohne Commit** ändert —
-ein neues Advisory bei OSV, eine geänderte Voreinstellung bei GitHub Actions,
-ein Werkzeug, das anders antwortet als letzte Woche.
+The page lives at `https://pheonix-studio-cat.github.io/Chinook-security/`.
 
-## Die Gegenprobe
+## The weekly run
+
+Mondays: checks, counterproof and all five bots over Chinook's own repository,
+without anyone having to commit anything. It catches what changes **without a
+commit** — a new advisory at OSV, a changed default in GitHub Actions, a tool
+that answers differently than last week.
+
+## The counterproof
 
 ```
-python3 -m checks.counterproof [--json gegenprobe.json]
+python3 -m checks.counterproof [--json counterproof.json]
 ```
 
-Sie kopiert das Repo, macht die Bots **absichtlich kaputt** — Redaktion
-abgeschaltet, eine Regel übersprungen, `is_pinned` gibt immer `True` zurück,
-der OSV-Fehler wird verschluckt, der Aufseher lässt Befunde fallen — und
-verlangt, dass die Prüfungen daraufhin **rot** werden. Fünfundzwanzig
-Mutationen, alle gefangen. Jede Mutation prüft vorher,
-dass sie die Datei überhaupt verändert hat; ohne das könnte eine wirkungslose
-Mutation ein Urteil fällen.
+It copies the repository, breaks the bots **on purpose** — redaction switched
+off, a rule skipped, `is_pinned` always returning `True`, the OSV error
+swallowed, the overseer dropping findings — and demands that the checks go
+**red** as a result. Thirty-one mutations, all caught. Each mutation first
+verifies that it changed the file at all; without that, an ineffective mutation
+could pass judgement.
 
-Der Grund für den ganzen Aufwand steht oben: *eine Prüfung, die nie gegen einen
-absichtlich kaputten Zustand gelaufen ist, ist keine Prüfung.*
+The reason for all of it is above: *a check that has never run against a
+deliberately broken state is not a check.*
 
 ---
 
-## Aufbau
+## Layout
 
 ```
-chinook/            die Bots, nur Standardbibliothek
-  findings.py       das gemeinsame Befund-Format, JSON und SARIF
+chinook/            the bots, standard library only
+  findings.py       the shared finding format, JSON and SARIF
   secret_bot.py  workflow_bot.py  dependency_bot.py  code_bot.py  license_bot.py
-  overseer.py       der Aufseher — ordnet ein, entfernt nie
+  overseer.py       the overseer — triages, never removes
   cli.py            python3 -m chinook.cli <bot> …
-actions/            je ein composite action pro Bot
-.github/workflows/  die Selbstprüfung
-webseite/build.py   erzeugt die Seite aus den Regeln der Bots
-checks/             Prüfungen und die Gegenprobe
-fixtures/workflows/ absichtlich kaputte Workflows — außerhalb von
-                    .github/workflows, damit GitHub sie nicht ausführt
-fixtures/code/      die Code-Proben als JSON — nicht als .py/.js/.sh, sonst
-                    meldete der Code-Bot seine eigenen Fixtures
-schema/             das Befund-Schema als JSON Schema
-docs/               Regeln im Einzelnen, Grenzen, Entscheidungen
+actions/            one composite action per bot
+.github/workflows/  the self-check
+webseite/build.py   generates the page from the bots' rules
+checks/             the checks and the counterproof
+fixtures/workflows/ deliberately broken workflows — outside .github/workflows
+                    so GitHub does not run them
+fixtures/code/      the code samples as JSON — not as .py/.js/.sh, or the code
+                    bot would report its own fixtures
+schema/             the finding format as JSON Schema
+docs/               the rules in detail, limits, decisions (German)
 ```
 
-Die Fixtures für Geheimnisse werden **zur Laufzeit erzeugt**
-(`checks/fixtures.py`), nicht als Datei abgelegt: ein formatgültiges Token im
-Repo wird von GitHubs Push-Protection blockiert und von Scannern gemeldet.
+The fixtures for secrets are **generated at runtime**
+(`checks/fixtures.py`), not stored as files: a format-valid token in the
+repository is blocked by GitHub's push protection and reported by scanners.
 
 ---
 
-## Was offen ist
+## Open
 
-- **`v1` taggen**, damit Nutzer `@v1` schreiben können statt `@main` oder eines
-  Commit-SHA.
-- **Der Aufseher ist nie gegen ein echtes Modell gelaufen.** Die Prüfungen
-  fahren gegen einen Stub — richtig so, geprüft wird, was Chinook mit der
-  Antwort macht. Ob ein echtes Modell brauchbare Einschätzungen liefert, ist
-  offen.
-- **Lizenzen der Abhängigkeiten** für den Lizenz-Bot — er sieht bisher nur das
-  Repo selbst, nicht das, was es einbindet.
-- **Behobene Versionen im Befund.** Die OSV-Sammelabfrage liefert nur
-  Kennungen; eine behobene Version bräuchte einen zweiten Abruf je Advisory.
+- **Tag `v1`**, so users can write `@v1` instead of `@main` or a commit SHA.
+- **The overseer has never run against a real model.** The checks run against a
+  stub — rightly so, what is checked is what Chinook does with the answer.
+  Whether a real model produces usable assessments is open.
+- **Licences of dependencies** for the licence bot — it currently sees only the
+  repository itself, not what it pulls in.
+- **Fixed versions in the finding.** The OSV batch query returns only IDs; a
+  fixed version would need a second request per advisory.
 
 ---
 
-## Lizenz
+## Licence
 
-MIT, siehe [`LICENSE`](LICENSE). Sicherheitslücken bitte nach
-[`SECURITY.md`](SECURITY.md) melden.
+MIT, see [`LICENSE`](LICENSE). Please report vulnerabilities as described in
+[`SECURITY.md`](SECURITY.md).
