@@ -230,6 +230,23 @@ def _gegenprobe(args) -> int:
             f"survived -- {finding.evidence}"
         )
 
+    # Ohne eine einzige gefangene Mutation fehlt die Positivkontrolle: der
+    # Lauf hat nie gezeigt, dass das Testkommando auf eine Codeaenderung
+    # reagiert. Dann sind die Befunde oben nicht zu deuten -- sie koennen
+    # heissen "die Tests sind schwach" oder "das Kommando prueft diesen Code
+    # gar nicht". Das ist genau der Fall, fuer den es die 2 gibt.
+    if coverage.get("control") == "none":
+        print(
+            "\ncounterproof-bot: not a single mutation was caught.\n"
+            "This run never showed that the test command reacts to a code change "
+            "at all, so the surviving mutations above cannot be read: they may mean "
+            "'the tests are weak' or 'the command does not exercise this code'.\n"
+            "Check that the test command runs the tests covering these files. "
+            "This run does not count as passing.",
+            file=sys.stderr,
+        )
+        return UNBEWIESEN
+
     if fmt.exceeds(results, args.fail_on):
         print(
             f"\nFailed: at least one surviving mutation reaches the threshold "

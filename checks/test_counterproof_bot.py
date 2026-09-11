@@ -312,10 +312,97 @@ class Lauf(unittest.TestCase):
             self.assertIn(schluessel, deckung)
         self.assertEqual(deckung["test_command"], "pytest")
 
+    def test_ohne_gefangene_mutation_fehlt_die_positivkontrolle(self):
+        """Der Fall, den der erste Lauf in einer echten CI gezeigt hat.
+
+        Wird **keine** Mutation gefangen, hat der Lauf nie gezeigt, dass das
+        Testkommando auf eine Codeaenderung reagiert. Dann ist "alles
+        entkommen" nicht von "das Kommando prueft diesen Code gar nicht" zu
+        unterscheiden.
+        """
+        _, deckung = cb.gegenprobe(
+            self.ordner, "true", laeufer=_Laeufer(ueberlebende=range(99))
+        )
+        self.assertEqual(deckung["mutations_caught"], 0)
+        self.assertEqual(deckung["control"], "none")
+
+    def test_eine_gefangene_mutation_genuegt_als_kontrolle(self):
+        """Die Gegenrichtung -- sonst bewiese die Pruefung oben nur Blindheit."""
+        _, deckung = cb.gegenprobe(
+            self.ordner, "true", laeufer=_Laeufer(ueberlebende=(1,))
+        )
+        self.assertGreater(deckung["mutations_caught"], 0)
+        self.assertEqual(deckung["control"], "ok")
+
+    def test_alles_gefangen_ist_auch_eine_kontrolle(self):
+        _, deckung = cb.gegenprobe(self.ordner, "true", laeufer=_Laeufer())
+        self.assertEqual(deckung["control"], "ok")
+
     def test_budget_begrenzt_die_laeufe(self):
         laeufer = _Laeufer()
         cb.gegenprobe(self.ordner, "true", budget=1, laeufer=laeufer)
         self.assertEqual(laeufer.aufrufe, 2)  # Vorlage plus eine Mutation
+
+
+class Kommandozeile(unittest.TestCase):
+    """Der Rueckgabewert ist die Aussage -- ihn prueft nur ein echter Aufruf.
+
+    Die Bots davor laufen hier gegen Stubs; hier laeuft die Kommandozeile
+    gegen echte Dateien und ein echtes Testkommando. Das ist langsamer und
+    dafuer das, was ein Nutzer tatsaechlich zu sehen bekommt.
+    """
+
+    def setUp(self):
+        self.ordner = tempfile.mkdtemp()
+        os.makedirs(os.path.join(self.ordner, "tests"))
+        with open(os.path.join(self.ordner, "auth.py"), "w", encoding="utf-8") as griff:
+            griff.write("def darf(rolle):\n    return rolle == 'admin'\n")
+
+    def _lauf(self, *zusatz):
+        import contextlib
+        import io
+
+        from chinook import cli
+
+        puffer = io.StringIO()
+        with contextlib.redirect_stdout(puffer), contextlib.redirect_stderr(puffer):
+            code = cli.main(["counterproof-bot", "--path", self.ordner, *zusatz])
+        return code, puffer.getvalue()
+
+    def test_ohne_positivkontrolle_zwei(self):
+        """Ein Testkommando, das immer gruen ist, faengt nie etwas.
+
+        Dann sind die entkommenen Mutationen nicht zu deuten, und der Lauf
+        darf nicht als bestanden gelten. Genau der Fall, den der erste Lauf in
+        einer echten CI geliefert hat.
+        """
+        code, ausgabe = self._lauf("--test-command", "true", "--budget", "3")
+        self.assertEqual(code, 2, "ein nicht deutbarer Lauf darf nicht bestehen")
+        self.assertIn("not a single mutation was caught", ausgabe)
+        self.assertIn("does not count as passing", ausgabe)
+
+    def test_mit_echten_tests_ein_befund(self):
+        """Die Gegenrichtung: faengt das Kommando etwas, gilt der Lauf."""
+        with open(os.path.join(self.ordner, "tests", "test_auth.py"), "w", encoding="utf-8") as griff:
+            griff.write(
+                "import sys, os, unittest\n"
+                "sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))\n"
+                "from auth import darf\n"
+                "class T(unittest.TestCase):\n"
+                "    def test_admin(self): self.assertTrue(darf('admin'))\n"
+                "    def test_gast(self): self.assertFalse(darf('gast'))\n"
+            )
+        code, ausgabe = self._lauf(
+            "--test-command", "python3 -m unittest discover -s tests -q", "--budget", "3"
+        )
+        self.assertIn("mutations caught", ausgabe)
+        self.assertNotIn("not a single mutation was caught", ausgabe)
+        self.assertIn(code, (0, 1), "mit Kontrolle ist das Ergebnis deutbar")
+
+    def test_ohne_testkommando_zwei(self):
+        code, ausgabe = self._lauf("--test-command", "")
+        self.assertEqual(code, 2)
+        self.assertIn("does not count as passing", ausgabe)
 
 
 class Zeitgrenze(unittest.TestCase):

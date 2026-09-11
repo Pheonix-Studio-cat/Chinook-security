@@ -34,11 +34,11 @@ findings and keeps the bots honest, the **website** and the **weekly run**.
 | **Counterproof bot** | ✅ breaks your code, runs your tests, reports what stayed green |
 | Composite action per bot | ✅ proven from a foreign repository too |
 | **Overseer** (AI layer) | ✅ triages, never removes |
-| Counterproof | ✅ 45 mutations, all caught |
+| Counterproof | ✅ 47 mutations, all caught |
 | **Website** | ✅ generated from the source, GitHub Pages |
 | **Weekly run** | ✅ Mondays, without a commit |
 
-**210 checks, all green. 45 mutations, all caught.**
+**216 checks, all green. 47 mutations, all caught.**
 
 **No dependencies.** The Python standard library only. A security tool with
 three hundred transitive packages is an attack surface itself, and a lockfile
@@ -179,6 +179,29 @@ and your CI would stay green.
 **It refuses to run against a red test suite.** If your tests already fail, a
 caught mutation cannot be told apart from an already broken build, so the run
 ends with **2** — "proves nothing" — and not with 0.
+
+**And it refuses to report when nothing was caught at all.** If not one
+mutation out of the whole budget was caught, the run never showed that your
+test command reacts to a code change — so "everything survived" cannot be told
+apart from "the command does not exercise this code". That also ends with
+**2**, with the surviving mutations printed but explicitly marked as
+unreadable. A measurement without a positive control is not a measurement.
+
+The first run in a real CI produced exactly that case:
+
+```
+counterproof-bot: 0 of 20 mutations caught
+  43 source file(s), 443 mutation(s) possible
+```
+
+while another repository, on the same day, produced a healthy one:
+
+```
+counterproof-bot: 11 of 20 mutations caught
+  33 source file(s), 613 mutation(s) possible
+```
+
+Without the control, both would have looked like a list of findings.
 
 > 🔒 **A finding never contains your source.** Reported are the location and the
 > operator, never the line that was changed. `if token == "hunter2"` would
@@ -387,7 +410,7 @@ python3 -m checks.counterproof [--json counterproof.json]
 It copies the repository, breaks the bots **on purpose** — redaction switched
 off, a rule skipped, `is_pinned` always returning `True`, the OSV error
 swallowed, the overseer dropping findings — and demands that the checks go
-**red** as a result. Forty-five mutations, all caught.
+**red** as a result. Forty-seven mutations, all caught.
 
 Each mutation first verifies that it changed the file at all, and that the text
 it replaces occurs **exactly once**. Without the first, an ineffective mutation

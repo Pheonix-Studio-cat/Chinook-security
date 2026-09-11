@@ -419,6 +419,37 @@ umfallen und gilt als gefangen -- das kostet Budget, meldet aber nichts
 Falsches. Gefaehrlich waere der andere Fall, und deshalb werden Kommentare und
 Zeichenketten ausgelassen, lieber einmal zu oft.
 
+### Ohne eine gefangene Mutation ist der Lauf unbewiesen
+
+Der erste Lauf, der wirklich durchkam, lieferte in einem Repo:
+
+    counterproof-bot: 0 of 20 mutations caught
+      43 source file(s), 443 mutation(s) possible
+
+Null von zwanzig. Am selben Tag, in einem anderen Repo:
+
+    counterproof-bot: 11 of 20 mutations caught
+
+Der zweite Wert ist gesund. Der erste ist **nicht zu deuten**: er kann heissen
+"die Tests sind schwach" oder "das Testkommando prueft diesen Code gar nicht
+-- es laeuft, aber es beruehrt die mutierten Dateien nie". Beides sieht
+identisch aus.
+
+Was fehlte, ist die **Positivkontrolle**: der Nachweis, dass das Messgeraet
+ueberhaupt ausschlaegt. Der Bot prueft, dass die Vorlage gruen ist -- aber
+nicht, dass sie **rot werden kann**.
+
+Seitdem: wurde von allen gelaufenen Mutationen **keine einzige** gefangen,
+endet der Lauf mit **2**, nicht mit 1. Die entkommenen Mutationen werden
+weiterhin ausgegeben, aber ausdruecklich als nicht deutbar gekennzeichnet.
+
+> *Eine Messung, die nie einen positiven Kontrollfall gezeigt hat, ist keine
+> Messung.* Das ist derselbe Gedanke wie bei der roten Vorlage, eine Stufe
+> tiefer -- und dieselbe 2.
+
+Zwei Mutationen halten es fest: eine dreht die Kontrolle ab, die andere laesst
+die Kommandozeile trotzdem mit Befunden statt mit 2 enden.
+
 ### Die Action war kein gueltiges YAML -- und meine Pruefung sagte, sie sei es
 
 Der erste Lauf in einer echten GitHub Action ist gescheitert, und zwar in

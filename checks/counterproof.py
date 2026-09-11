@@ -393,6 +393,23 @@ MUTATIONEN: tuple[Mutation, ...] = (
         neu='            if False:',
         trifft="the YAML check passes because it looked at no file at all",
     ),
+    # --- Die Positivkontrolle. Ohne eine gefangene Mutation hat der Lauf nie
+    # gezeigt, dass das Testkommando auf eine Codeaenderung reagiert. Der
+    # erste Lauf in einer echten CI hat genau diesen Fall geliefert.
+    Mutation(
+        name="missing-positive-control-ignored",
+        datei="chinook/counterproof_bot.py",
+        alt='        "control": "none" if gelaufen and not gefangen else "ok",',
+        neu='        "control": "ok",',
+        trifft="a test command that never reacts to a change looks like weak tests",
+    ),
+    Mutation(
+        name="missing-control-still-passes",
+        datei="chinook/cli.py",
+        alt='    if coverage.get("control") == "none":',
+        neu='    if False:',
+        trifft="an unreadable run reports findings instead of ending with 2",
+    ),
 )
 
 

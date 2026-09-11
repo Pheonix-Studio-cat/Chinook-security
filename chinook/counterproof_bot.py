@@ -31,6 +31,12 @@ Ort und Operator, sonst nichts.
 **Die Auswahl ist bestimmt, nicht zufaellig.** Zwei Laeufe ueber denselben
 Stand pruefen dieselben Mutationen. Ein Bot, der jedes Mal etwas anderes misst,
 ist in einer CI nicht zu gebrauchen.
+
+**Ohne eine einzige gefangene Mutation gilt der Lauf als unbewiesen.** Wurde
+nichts gefangen, hat er nie gezeigt, dass das Testkommando ueberhaupt auf eine
+Codeaenderung reagiert -- dann ist "alles entkommen" nicht von "das Kommando
+prueft den mutierten Code gar nicht" zu unterscheiden. Das ist die
+Positivkontrolle, und ohne sie ist eine Messung keine.
 """
 
 from __future__ import annotations
@@ -580,13 +586,20 @@ def gegenprobe(
         else:
             gefangen += 1
 
+    gelaufen = gefangen + len(befunde)
     deckung = {
         "test_command": testkommando,
         "source_files": len(quellen),
         "mutations_possible": len(alle),
-        "mutations_run": gefangen + len(befunde),
+        "mutations_run": gelaufen,
         "mutations_caught": gefangen,
         "mutations_survived": len(befunde),
+        # Die Positivkontrolle. Wurde **keine** Mutation gefangen, hat der
+        # Lauf nie gezeigt, dass das Testkommando ueberhaupt auf eine
+        # Codeaenderung reagiert -- und dann ist "alles entkommen" nicht von
+        # "das Kommando prueft den mutierten Code gar nicht" zu unterscheiden.
+        # Beim ersten Lauf in einer echten CI war genau das der Fall.
+        "control": "none" if gelaufen and not gefangen else "ok",
     }
     return befunde, deckung
 
