@@ -22,6 +22,7 @@ import re
 from chinook import (
     __version__,
     code_bot,
+    counterproof_bot,
     dependency_bot,
     findings,
     license_bot,
@@ -34,6 +35,12 @@ WURZEL = pathlib.Path(__file__).resolve().parent.parent
 REPO = "https://github.com/Pheonix-Studio-cat/Chinook-security"
 
 BOTS = (
+    (
+        counterproof_bot,
+        "Counterproof bot",
+        "Breaks your code on purpose and runs <em>your</em> tests. Every other bot tells "
+        "you what is in your code; this one tells you what your tests would not notice.",
+    ),
     (
         secret_bot,
         "Secret bot",
@@ -254,7 +261,10 @@ def baue(gegenprobe: dict | None = None) -> str:
     mutationen = gegenprobe.get("gesamt") if gegenprobe else None
 
     kacheln = [
-        ("5", "bots"),
+        # Aus der Quelle gezaehlt, nicht hingeschrieben. Stand hier eine
+        # feste Zahl, waere sie beim sechsten Bot falsch geworden --
+        # auf einer Seite, deren Punkt es ist, nicht zu driften.
+        (str(len(BOTS)), "bots"),
         (str(regelzahl), "rules"),
         (str(zaehle_pruefungen()), "checks"),
         (str(mutationen) if mutationen else "\u2013", "mutations"),

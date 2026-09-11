@@ -1,6 +1,7 @@
 """Ein Einstiegspunkt fuer alle Bots: `python3 -m chinook.cli <bot> ...`
 
-Die Ausgabe ist Deutsch und enthaelt nie einen gefundenen Wert.
+Die Ausgabe ist Englisch -- sie landet in fremden Action-Logs -- und sie
+enthaelt nie einen gefundenen Wert.
 """
 
 from __future__ import annotations
@@ -10,7 +11,15 @@ import os
 import sys
 
 from . import findings as fmt
-from . import code_bot, dependency_bot, license_bot, overseer, secret_bot, workflow_bot
+from . import (
+    code_bot,
+    counterproof_bot,
+    dependency_bot,
+    license_bot,
+    overseer,
+    secret_bot,
+    workflow_bot,
+)
 
 BOTS = {
     "secret-bot": secret_bot,
@@ -45,7 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "bot",
-        choices=sorted([*BOTS, "overseer"]),
+        choices=sorted([*BOTS, "overseer", "counterproof-bot"]),
         help="which bot to run (or `overseer` to triage findings)",
     )
     parser.add_argument("--path", default=".", help="root of the repository to check")
@@ -92,6 +101,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-fallbacks",
         action="store_true",
         help="ask without server-side model fallback (overseer only)",
+    )
+    parser.add_argument(
+        "--test-command",
+        default="",
+        help="the command that runs your tests (counterproof-bot only, required)",
+    )
+    parser.add_argument(
+        "--budget",
+        type=int,
+        default=20,
+        help="how many mutations to run (counterproof-bot only, default: 20)",
+    )
+    parser.add_argument(
+        "--test-timeout",
+        type=int,
+        default=600,
+        help="seconds one test run may take (counterproof-bot only)",
     )
     parser.add_argument(
         "--fail-on",
@@ -155,10 +181,88 @@ def _aufseher(args) -> int:
     return OK
 
 
+def _gegenprobe(args) -> int:
+    """Der Gegenproben-Bot hat eine andere Form als die uebrigen.
+
+    Er meldet nicht nur, was er fand, sondern auch **wie viel er gemessen
+    hat**. Ein gruener Lauf ohne diese Zahlen waere genau die Sorte Erfolg,
+    gegen die dieser Bot gebaut ist: er koennte bedeuten, dass nichts
+    entkommen ist -- oder dass nichts geprueft wurde.
+    """
+    try:
+        results, coverage = counterproof_bot.gegenprobe(
+            args.path,
+            args.test_command,
+            budget=args.budget,
+            zeitgrenze=args.test_timeout,
+            ausschluss=tuple(_split(args.exclude)),
+        )
+    except counterproof_bot.Unprovable as fehler:
+        print(
+            f"counterproof-bot: nothing could be proved -- {fehler}\n"
+            "This run says nothing about whether your tests would catch a change. "
+            "It therefore does not count as passing.",
+            file=sys.stderr,
+        )
+        return UNBEWIESEN
+
+    report = fmt.report(
+        "counterproof-bot",
+        results,
+        target={"path": os.path.abspath(args.path), **coverage},
+    )
+    if args.json_out:
+        _write(args.json_out, report)
+    if args.sarif_out:
+        _write(args.sarif_out, fmt.to_sarif("counterproof-bot", results))
+
+    print(
+        f"counterproof-bot: {coverage['mutations_caught']} of "
+        f"{coverage['mutations_run']} mutations caught"
+    )
+    print(
+        f"  {coverage['source_files']} source file(s), "
+        f"{coverage['mutations_possible']} mutation(s) possible"
+    )
+    for finding in fmt.sort_findings(results):
+        print(
+            f"  [{_SEVERITY_LABEL[finding.severity]}] {finding.path}:{finding.line} "
+            f"survived -- {finding.evidence}"
+        )
+
+    # Ohne eine einzige gefangene Mutation fehlt die Positivkontrolle: der
+    # Lauf hat nie gezeigt, dass das Testkommando auf eine Codeaenderung
+    # reagiert. Dann sind die Befunde oben nicht zu deuten -- sie koennen
+    # heissen "die Tests sind schwach" oder "das Kommando prueft diesen Code
+    # gar nicht". Das ist genau der Fall, fuer den es die 2 gibt.
+    if coverage.get("control") == "none":
+        print(
+            "\ncounterproof-bot: not a single mutation was caught.\n"
+            "This run never showed that the test command reacts to a code change "
+            "at all, so the surviving mutations above cannot be read: they may mean "
+            "'the tests are weak' or 'the command does not exercise this code'.\n"
+            "Check that the test command runs the tests covering these files. "
+            "This run does not count as passing.",
+            file=sys.stderr,
+        )
+        return UNBEWIESEN
+
+    if fmt.exceeds(results, args.fail_on):
+        print(
+            f"\nFailed: at least one surviving mutation reaches the threshold "
+            f"'{_SEVERITY_LABEL.get(args.fail_on, args.fail_on)}'.",
+            file=sys.stderr,
+        )
+        return BEFUNDE
+    return OK
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     if args.bot == "overseer":
         return _aufseher(args)
+    if args.bot == "counterproof-bot":
+        return _gegenprobe(args)
     module = BOTS[args.bot]
     excludes = _split(args.exclude)
 

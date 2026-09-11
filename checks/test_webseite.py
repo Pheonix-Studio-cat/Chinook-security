@@ -12,11 +12,28 @@ import pathlib
 import tempfile
 import unittest
 
-from chinook import code_bot, dependency_bot, license_bot, secret_bot, workflow_bot
+from chinook import (
+    code_bot,
+    counterproof_bot,
+    dependency_bot,
+    license_bot,
+    secret_bot,
+    workflow_bot,
+)
 from webseite import build
 
 WURZEL = pathlib.Path(__file__).resolve().parent.parent
-ALLE = (secret_bot, workflow_bot, dependency_bot, code_bot, license_bot)
+# Aus der Bot-Tabelle der Website abgeleitet, nicht danebengeschrieben. Eine
+# zweite Liste waere eine zweite Wahrheit: ein neuer Bot koennte dort fehlen,
+# und die Pruefung waere gruen, ohne ihn je angesehen zu haben.
+ALLE = tuple(modul for modul, _, _ in build.BOTS)
+
+# Die Gegenrichtung: alle Bot-Module, die es gibt. Fehlt eines in der
+# Tabelle oben, faellt es hier auf statt unbemerkt zu bleiben.
+BEKANNTE_MODULE = (
+    secret_bot, workflow_bot, dependency_bot, code_bot, license_bot,
+    counterproof_bot,
+)
 
 
 def seite(gegenprobe=None) -> str:
@@ -31,6 +48,18 @@ class RegelnAufDerSeiteTest(unittest.TestCase):
                 with self.subTest(bot=modul.BOT, regel=regel["name"]):
                     self.assertIn(regel["name"], text)
                     self.assertIn(html.escape(regel["titel"], quote=False), text)
+
+    def test_kein_bot_fehlt_auf_der_seite(self):
+        """Der Fall, der diese Pruefung noetig gemacht hat.
+
+        Beim sechsten Bot stand die Zahl der Bots noch von Hand in der Seite
+        und die Liste hier noch von Hand daneben. Beides konnte veralten, ohne
+        dass etwas rot wurde.
+        """
+        self.assertEqual(set(ALLE), set(BEKANNTE_MODULE))
+
+    def test_die_zahl_der_bots_ist_gezaehlt_nicht_geschrieben(self):
+        self.assertIn(f'<span class="zahl">{len(BEKANNTE_MODULE)}</span>', seite())
 
     def test_die_zahl_der_regeln_stimmt(self):
         gesamt = sum(len(modul.regeln()) for modul in ALLE)

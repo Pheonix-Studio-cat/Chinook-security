@@ -359,3 +359,138 @@ JSON-Schema. Beides ist jetzt englisch. Die Lehre steht im Gedächtnis-Repo als
 Fehler Nr. 19: *wer die Ausgabe eines Werkzeugs übersetzt, ruft das Werkzeug
 danach auf.* Den Quelltext zu lesen genügt nicht — `help="..."` sieht nicht wie
 Prosa aus.
+
+---
+
+## Der Gegenproben-Bot: das eigene Verfahren nach aussen gedreht
+
+Die Gegenprobe war von Anfang an das, was Chinook Security von anderen
+Sicherheitswerkzeugen unterscheidet -- und sie prueft bis jetzt nur die eigenen
+Bots. Der Gegenproben-Bot richtet dasselbe Verfahren auf ein **fremdes** Repo:
+er bricht dessen Code absichtlich und laesst dessen eigene Tests laufen.
+
+**Warum das ein Sicherheitsbefund ist und nicht bloss ein Testwerkzeug.** Jeder
+andere Bot hier sagt, was im Code steht. Dieser sagt, was die Pruefungen nicht
+merken wuerden. Eine gruene Pruefsuite, die eine entschaerfte
+Berechtigungspruefung durchwinkt, sieht genauso aus wie eine, die sie faengt --
+und genau diese Sorte Luecke ist die teure.
+
+### Vier Entscheidungen, die dabei fielen
+
+**1. Rote Vorlage heisst 2, nicht 0.** Laeuft die Pruefsuite schon vorher rot,
+ist "gefangen" nicht von "war schon kaputt" zu unterscheiden. Der Bot mutiert
+dann gar nicht erst und meldet `Unprovable`. Dasselbe bei fehlendem
+Testkommando und bei nichts Mutierbarem.
+
+**2. Der Befund traegt nie den Quelltext.** In `if token == "..."` steckt ein
+Geheimnis, und der Bericht landet in einem fremden Action-Log. Gemeldet werden
+Ort und Operator. Die erste Fassung verletzte das: `return-forced-true` schrieb
+den urspruenglichen Rueckgabeausdruck mit. Gefangen hat es eine Pruefung, die
+genau danach sucht -- sie steht jetzt in der allgemeinen Fassung da und gilt
+fuer **jeden** kuenftigen Operator, nicht nur den einen bekannten Fall.
+
+**3. Keine Shell.** Der Bot bekommt ein Kommando von aussen und fuehrt es aus --
+das ist sein Zweck. Die Shell dazwischen liess sich aber vermeiden, und der
+eigene Code-Bot hat das angemahnt, als sie noch mitlief. Die Regel zu
+entschaerfen waere der falsche Weg gewesen; `shlex.split` und ein Aufruf ohne
+Shell haben nichts gekostet: `npm test`, `vitest run`, `bash tests/run.sh`,
+`python3 -m unittest discover` brauchen keine. Wer wirklich eine will, schreibt
+`sh -c "..."` hin und sieht sie dann auch in seiner Workflow-Datei stehen.
+
+**4. Die Auswahl ist bestimmt, nicht zufaellig.** Zwei Laeufe ueber denselben
+Stand pruefen dieselben Mutationen, sicherheitsnahe zuerst. Reihum ueber die
+Dateien, damit eine einzige grosse nicht das ganze Budget frisst und der Rest
+ungeprueft bleibt, ohne dass es auffaellt. Ein Bot, der jedes Mal etwas anderes
+misst, ist in einer CI nicht zu gebrauchen.
+
+### Python ueber den Syntaxbaum, JavaScript zeilenweise
+
+Fuer Python sagt `ast` (Standardbibliothek, also keine Abhaengigkeit), **wo**
+etwas steht; ersetzt wird im Text. `ast.unparse` wuerde die ganze Datei neu
+schreiben und dabei Kommentare und Formatierung verlieren -- das waere ein
+zweiter, ungewollter Unterschied, und ein zweiter Unterschied macht die Messung
+wertlos.
+
+Fuer JavaScript und TypeScript gibt es keinen Parser in der
+Standardbibliothek. Also zeilenweise, dieselbe Entscheidung wie beim
+Workflow-Bot. Der Preis ist Genauigkeit, und er wird bewusst in die **sichere**
+Richtung bezahlt: eine Mutation, die Unsinn erzeugt, laesst die Pruefsuite
+umfallen und gilt als gefangen -- das kostet Budget, meldet aber nichts
+Falsches. Gefaehrlich waere der andere Fall, und deshalb werden Kommentare und
+Zeichenketten ausgelassen, lieber einmal zu oft.
+
+### Ohne eine gefangene Mutation ist der Lauf unbewiesen
+
+Der erste Lauf, der wirklich durchkam, lieferte in einem Repo:
+
+    counterproof-bot: 0 of 20 mutations caught
+      43 source file(s), 443 mutation(s) possible
+
+Null von zwanzig. Am selben Tag, in einem anderen Repo:
+
+    counterproof-bot: 11 of 20 mutations caught
+
+Der zweite Wert ist gesund. Der erste ist **nicht zu deuten**: er kann heissen
+"die Tests sind schwach" oder "das Testkommando prueft diesen Code gar nicht
+-- es laeuft, aber es beruehrt die mutierten Dateien nie". Beides sieht
+identisch aus.
+
+Was fehlte, ist die **Positivkontrolle**: der Nachweis, dass das Messgeraet
+ueberhaupt ausschlaegt. Der Bot prueft, dass die Vorlage gruen ist -- aber
+nicht, dass sie **rot werden kann**.
+
+Seitdem: wurde von allen gelaufenen Mutationen **keine einzige** gefangen,
+endet der Lauf mit **2**, nicht mit 1. Die entkommenen Mutationen werden
+weiterhin ausgegeben, aber ausdruecklich als nicht deutbar gekennzeichnet.
+
+> *Eine Messung, die nie einen positiven Kontrollfall gezeigt hat, ist keine
+> Messung.* Das ist derselbe Gedanke wie bei der roten Vorlage, eine Stufe
+> tiefer -- und dieselbe 2.
+
+Zwei Mutationen halten es fest: eine dreht die Kontrolle ab, die andere laesst
+die Kommandozeile trotzdem mit Befunden statt mit 2 enden.
+
+### Die Action war kein gueltiges YAML -- und meine Pruefung sagte, sie sei es
+
+Der erste Lauf in einer echten GitHub Action ist gescheitert, und zwar in
+sechs Sekunden:
+
+    (Line: 108, Col: 1) While scanning a simple key, could not find expected ':'
+    Failed to load .../actions/counterproof/action.yml
+
+In `action.yml` stand ein mehrzeiliges Python-Skript innerhalb eines
+`run: |`-Blocks, und seine Zeilen begannen auf **Spalte 0**. YAML beendet
+einen Block-Skalar bei der ersten Zeile, die nicht tiefer eingerueckt ist als
+der Schluessel -- aus `import json, sys` wurde ein Schluessel auf oberster
+Ebene.
+
+**Geprueft hatte ich das vorher.** Meine Pruefung suchte nach Zeichenketten
+(`"name:" in text`, `"run:" in text`) und fand sie alle -- in einer Datei, die
+GitHub nicht einmal einlesen konnte. Gruen, und ohne jede Aussage. Zusaetzlich
+lief der Workflow-Bot darueber und meldete null Befunde; auch er ist
+zeilenweise und prueft Sicherheit, nicht Ladbarkeit.
+
+Der Fehler ist in vier fremde Repos gelangt, bevor er auffiel.
+
+Die Antwort ist `checks/test_yaml_bloecke.py`: kein Parser (den gibt es in der
+Standardbibliothek nicht, und eine Abhaengigkeit kommt nicht in Frage),
+sondern **genau diese Fehlerklasse**, zeilenweise, ueber jede `.yml` im Repo.
+Nachgewiesen an der kaputten Fassung aus dem Commit: sie wird gefangen, die
+reparierte nicht. Zwei Mutationen halten die Pruefung fest -- eine dreht sie
+ab, die andere laesst sie auf null Dateien schauen.
+
+> *Der Einbau einer Datei zu pruefen heisst, sie einbauen zu lassen. Dass die
+> erwarteten Woerter darin vorkommen, sagt nichts darueber, ob sie geladen
+> werden kann.*
+
+### Was der neue Bot nebenbei aufgedeckt hat
+
+Die Seite schrieb **"5 bots" von Hand** -- auf einer Seite, deren erklaerter
+Punkt es ist, aus der Quelle erzeugt und nicht gepflegt zu sein. Ebenso die
+Liste der Bot-Module in der zugehoerigen Pruefung. Beides ist jetzt abgeleitet,
+und zwei Mutationen halten es fest.
+
+Und zwei bestehende Mutationen waren **mehrdeutig**: ihr Suchtext kam mehrfach
+in `cli.py` vor, `replace(..., 1)` traf die erste Stelle statt der gemeinten.
+Eine davon war es von Anfang an. Die Gegenprobe weist Mehrdeutigkeit jetzt
+zurueck, statt sie stillschweigend hinzunehmen.

@@ -19,7 +19,7 @@ stays green is treated as worthless, and said so.
 
 ## Status
 
-**All five stages are built:** the shared finding format, five bots, the
+**All five stages are built:** the shared finding format, six bots, the
 counterproof, one composite action per bot, the **overseer** that triages the
 findings and keeps the bots honest, the **website** and the **weekly run**.
 
@@ -31,13 +31,14 @@ findings and keeps the bots honest, the **website** and the **weekly run**.
 | **Dependency bot** | ✅ lockfiles against OSV.dev |
 | **Code bot** | ✅ 12 patterns in Python, JavaScript, shell |
 | **Licence bot** | ✅ what is missing and what disagrees |
+| **Counterproof bot** | ✅ breaks your code, runs your tests, reports what stayed green |
 | Composite action per bot | ✅ proven from a foreign repository too |
 | **Overseer** (AI layer) | ✅ triages, never removes |
-| Counterproof | ✅ 31 mutations, all caught |
+| Counterproof | ✅ 47 mutations, all caught |
 | **Website** | ✅ generated from the source, GitHub Pages |
 | **Weekly run** | ✅ Mondays, without a commit |
 
-**162 checks, all green. 31 mutations, all caught.**
+**216 checks, all green. 47 mutations, all caught.**
 
 **No dependencies.** The Python standard library only. A security tool with
 three hundred transitive packages is an attack surface itself, and a lockfile
@@ -72,6 +73,19 @@ jobs:
       - uses: Pheonix-Studio-cat/Chinook-security/actions/code-bot@main
       - uses: Pheonix-Studio-cat/Chinook-security/actions/license-bot@main
 ```
+
+The **counterproof bot** is a separate step, because it needs to know how to run
+your tests — and because it costs one test run per mutation:
+
+```yaml
+      - uses: Pheonix-Studio-cat/Chinook-security/actions/counterproof@main
+        with:
+          test-command: "npm test"   # or: vitest run / pytest / bash tests/run.sh
+          budget: "20"               # mutations to run; each is a full test run
+```
+
+No test command, a red test suite, or nothing it can break — and the step ends
+with **2**, not 0. It never reports a clean run it did not earn.
 
 The **overseer** is a separate step, if you want it:
 
@@ -136,6 +150,85 @@ permission that belongs **in the individual job**, not at the top of the file.
 ---
 
 ## What the bots find
+
+### Counterproof bot
+
+**Every other bot tells you what is in your code. This one tells you what your
+tests would not notice.**
+
+It changes your code on purpose — flips a comparison, turns an `and` into an
+`or`, forces a `return` to `true` — then runs **your own test suite**. Whatever
+stays green is a behaviour that nothing checks.
+
+```
+counterproof-bot: 14 of 20 mutations caught
+  38 source file(s), 412 mutation(s) possible
+  [high] src/auth.js:31 survived -- boolean-operator-swapped: && -> || (source line not shown)
+```
+
+That line says: somebody could weaken the condition in your permission check
+and your CI would stay green.
+
+| What | How |
+| --- | --- |
+| Languages | Python (via the syntax tree), JavaScript and TypeScript (line-based) |
+| Test command | yours — `npm test`, `vitest run`, `pytest`, `bash tests/run.sh` |
+| Severity | `high` in security-relevant code, `low` elsewhere |
+| Cost | one full test run per mutation — `budget` is the dial |
+
+**Budget × test-timeout is your worst case.** The default 20 × 600 s is over
+three hours, and GitHub cancels a job after six. What it actually costs
+depends entirely on how fast your suite starts. Measured on real runs:
+
+| Suite | Mutations | Duration | Per run |
+| --- | --- | --- | --- |
+| `vitest run` | 20 | 70 s – 160 s | 4 – 8 s |
+| `pytest -q` (with ML dependencies) | 25 | 16.4 min | 38 s |
+
+Start with a small budget, read the actual duration off the run, then raise
+it.
+
+**It refuses to run against a red test suite.** If your tests already fail, a
+caught mutation cannot be told apart from an already broken build, so the run
+ends with **2** — "proves nothing" — and not with 0.
+
+**And it refuses to report when nothing was caught at all.** If not one
+mutation out of the whole budget was caught, the run never showed that your
+test command reacts to a code change — so "everything survived" cannot be told
+apart from "the command does not exercise this code". That also ends with
+**2**, with the surviving mutations printed but explicitly marked as
+unreadable. A measurement without a positive control is not a measurement.
+
+The first run in a real CI produced exactly that case:
+
+```
+counterproof-bot: 0 of 20 mutations caught
+  43 source file(s), 443 mutation(s) possible
+```
+
+while another repository, on the same day, produced a healthy one:
+
+```
+counterproof-bot: 11 of 20 mutations caught
+  33 source file(s), 613 mutation(s) possible
+```
+
+Without the control, both would have looked like a list of findings.
+
+> 🔒 **A finding never contains your source.** Reported are the location and the
+> operator, never the line that was changed. `if token == "hunter2"` would
+> otherwise put the password into the action log — the same rule the secret bot
+> follows, and for the same reason. A check holds this for *every* operator, and
+> it caught a real leak in the first version of this bot.
+
+**The report always carries the coverage.** `0 survived` means nothing on its
+own — it could mean nothing escaped, or that nothing was measured. So the number
+of mutations run stands next to it, always.
+
+**The selection is deterministic, not random.** Two runs over the same commit
+test the same mutations; security-relevant files come first, and no single large
+file can eat the whole budget. A bot that measures something different every
+time is useless in CI.
 
 ### Secret bot
 
@@ -329,9 +422,18 @@ python3 -m checks.counterproof [--json counterproof.json]
 It copies the repository, breaks the bots **on purpose** — redaction switched
 off, a rule skipped, `is_pinned` always returning `True`, the OSV error
 swallowed, the overseer dropping findings — and demands that the checks go
-**red** as a result. Thirty-one mutations, all caught. Each mutation first
-verifies that it changed the file at all; without that, an ineffective mutation
-could pass judgement.
+**red** as a result. Forty-seven mutations, all caught.
+
+Each mutation first verifies that it changed the file at all, and that the text
+it replaces occurs **exactly once**. Without the first, an ineffective mutation
+could pass judgement. Without the second, a mutation silently moves to a
+different place when the file grows — which is exactly what happened when the
+sixth bot was added, to two mutations that had been ambiguous from the start.
+
+Ten of the forty-three break the **counterproof bot itself**: the report leaking
+source, a comment being mutated, a red baseline accepted, someone else's source
+left broken on disk. The bot that breaks foreign code is the last one that
+should be taken at its word.
 
 The reason for all of it is above: *a check that has never run against a
 deliberately broken state is not a check.*

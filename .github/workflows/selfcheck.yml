@@ -50,6 +50,19 @@ jobs:
           fail-on: medium
           sarif: ""
 
+      # Der Gegenproben-Bot auf das eigene Repo. Das Budget ist klein, weil
+      # jede Mutation einen vollen Lauf der 202 Pruefungen kostet -- und der
+      # eigentliche Beweis liegt ohnehin in `checks/counterproof.py` mit
+      # seinen 43 benannten Mutationen. Dieser Schritt zeigt etwas anderes:
+      # dass der Bot auf einem echten Repo laeuft, nicht nur auf Beispielen.
+      - name: Gegenproben-Bot auf das eigene Repo
+        uses: ./actions/counterproof
+        with:
+          test-command: "python3 -m unittest discover -s checks -t . -q"
+          budget: "6"
+          test-timeout: "300"
+          sarif: ""
+
       - name: Lizenz-Bot auf das eigene Repo
         uses: ./actions/license-bot
         with:
