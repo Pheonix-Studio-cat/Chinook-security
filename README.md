@@ -176,6 +176,16 @@ and your CI would stay green.
 | Severity | `high` in security-relevant code, `low` elsewhere |
 | Cost | one full test run per mutation — `budget` is the dial |
 
+**Budget × test-timeout is your worst case.** The default 20 × 600 s is over
+three hours, and GitHub cancels a job after six. What that costs in practice
+depends entirely on how fast your suite starts: three measured `vitest` runs
+came in at 70 s, 99 s and 160 s for 20 mutations — roughly 4 to 8 seconds
+each. A suite that takes half a minute to start turns the same budget into
+a quarter of an hour.
+
+Start with a small budget, look at the actual duration in the run, then raise
+it.
+
 **It refuses to run against a red test suite.** If your tests already fail, a
 caught mutation cannot be told apart from an already broken build, so the run
 ends with **2** — "proves nothing" — and not with 0.
