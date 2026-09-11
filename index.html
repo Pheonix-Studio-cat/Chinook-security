@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chinook Security &mdash; bots as GitHub Actions</title>
+<meta name="description" content="Open-source security bots as GitHub Actions, with an AI layer that keeps the bots honest. Every check is counter-proved.">
+<style>
+:root {
+  color-scheme: light dark;
+  --grund: #fbfaf8;
+  --karte: #ffffff;
+  --rand: #e4e0d8;
+  --text: #1b1a18;
+  --leise: #5f5b54;
+  --akzent: #7a4b1e;
+  --kritisch: #a3271c;
+  --hoch: #b4531a;
+  --mittel: #8a6d13;
+  --leicht: #4a6b45;
+  --code-grund: #f2efe9;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --grund: #16161a;
+    --karte: #1e1e24;
+    --rand: #33333c;
+    --text: #ece9e4;
+    --leise: #a5a099;
+    --akzent: #e0a06a;
+    --kritisch: #f08076;
+    --hoch: #eda06a;
+    --mittel: #d9c05f;
+    --leicht: #90c188;
+    --code-grund: #121216;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--grund);
+  color: var(--text);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.huelle { max-width: 54rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+header { border-bottom: 2px solid var(--rand); padding-bottom: 1.75rem; margin-bottom: 2.5rem; }
+h1 { font-size: 2.4rem; line-height: 1.15; margin: 0 0 .5rem; letter-spacing: -.02em; }
+h1 .unter { display: block; font-size: 1rem; font-weight: 400; color: var(--leise); margin-top: .6rem; }
+h2 { font-size: 1.5rem; margin: 3rem 0 .75rem; letter-spacing: -.01em; }
+h3 { font-size: 1.1rem; margin: 2rem 0 .35rem; }
+p { margin: .75rem 0; }
+a { color: var(--akzent); }
+.leise { color: var(--leise); }
+.karten { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); margin: 1.5rem 0; }
+.kachel { background: var(--karte); border: 1px solid var(--rand); border-radius: .6rem; padding: .9rem 1rem; }
+.kachel .zahl { font-size: 1.9rem; font-weight: 650; line-height: 1.1; display: block; }
+.kachel .wofuer { font-size: .82rem; color: var(--leise); }
+pre {
+  background: var(--code-grund); border: 1px solid var(--rand); border-radius: .6rem;
+  padding: 1rem; overflow-x: auto; font-size: .85rem; line-height: 1.5;
+}
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; }
+p code, li code, td code { background: var(--code-grund); padding: .1em .35em; border-radius: .3em; }
+.tabellenhuelle { overflow-x: auto; margin: 1rem 0; }
+table { border-collapse: collapse; width: 100%; min-width: 32rem; font-size: .93rem; }
+th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--rand); vertical-align: top; }
+th { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--leise); font-weight: 600; }
+.marke { font-size: .74rem; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.s-critical { color: var(--kritisch); }
+.s-high { color: var(--hoch); }
+.s-medium { color: var(--mittel); }
+.s-low, .s-info { color: var(--leicht); }
+.merksatz {
+  border-left: 3px solid var(--akzent); background: var(--karte);
+  padding: .9rem 1.1rem; margin: 1.5rem 0; border-radius: 0 .5rem .5rem 0;
+}
+.merksatz p:first-child { margin-top: 0; }
+.merksatz p:last-child { margin-bottom: 0; }
+.gefangen { color: var(--leicht); font-weight: 650; }
+.entkommen { color: var(--kritisch); font-weight: 650; }
+footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--rand); color: var(--leise); font-size: .88rem; }
+</style>
+</head>
+<body>
+<div class="huelle">
+
+<header>
+<h1>Chinook Security
+<span class="unter">Security bots as GitHub Actions &mdash; and an AI layer that keeps
+the bots honest. Open source, MIT, version 0.1.0.</span></h1>
+</header>
+
+<div class="karten"><div class="kachel"><span class="zahl">6</span><span class="wofuer">bots</span></div><div class="kachel"><span class="zahl">34</span><span class="wofuer">rules</span></div><div class="kachel"><span class="zahl">216</span><span class="wofuer">checks</span></div><div class="kachel"><span class="zahl">47</span><span class="wofuer">mutations</span></div><div class="kachel"><span class="zahl">0</span><span class="wofuer">dependencies</span></div></div>
+
+<div class="merksatz">
+<p>A security tool that runs green without checking anything is worse than none:
+it creates trust that carries nothing.</p>
+<p>That is why the <strong>counterproof</strong> is not an extra in Chinook Security but the
+core &mdash; every rule is run against a deliberately broken case, and every check
+against a deliberately broken bot.</p>
+</div>
+
+<h2>Installing</h2>
+<p>Into the repository you want checked, as <code>.github/workflows/chinook.yml</code>:</p>
+<pre><code>name: Chinook Security
+on: [pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # only needed for the history check
+
+      - uses: Pheonix-Studio-cat/Chinook-security/actions/secret-bot@main
+        with:
+          history: "true"
+      - uses: Pheonix-Studio-cat/Chinook-security/actions/workflow-bot@main
+      - uses: Pheonix-Studio-cat/Chinook-security/actions/dependency-bot@main
+      - uses: Pheonix-Studio-cat/Chinook-security/actions/code-bot@main
+      - uses: Pheonix-Studio-cat/Chinook-security/actions/license-bot@main</code></pre>
+<p><code>@main</code> is for trying it out. For day-to-day use, pin a commit SHA
+&mdash; exactly what the workflow bot demands of every other action.</p>
+
+<h3>Exit codes</h3>
+<div class="tabellenhuelle"><table>
+<tr><th>Value</th><th>Meaning</th></tr>
+<tr><td><code>0</code></td><td>nothing found that reaches the threshold</td></tr>
+<tr><td><code>1</code></td><td>findings at or above the threshold</td></tr>
+<tr><td><code>2</code></td><td><strong>the run could not determine anything</strong> &mdash;
+e.g. OSV was unreachable</td></tr>
+</table></div>
+<p>The <code>2</code> is the reason it exists: a request that did not get through
+is not an empty result. It does not count as passing.</p>
+
+<h2>The bots</h2>
+<h3>Counterproof bot</h3><p>Breaks your code on purpose and runs <em>your</em> tests. Every other bot tells you what is in your code; this one tells you what your tests would not notice.</p><div class="tabellenhuelle"><table><tr><th>Rule</th><th>Severity</th><th>What it means</th></tr><tr><td><code>mutation-survived</code><br><span class="leise">A deliberate break went unnoticed</span></td><td><span class="marke s-high">high</span></td><td>The bot changes the code on purpose -- flips a comparison, turns an `and` into an `or`, forces a `return` to `true` -- and runs your own test suite. Whatever stays green is a behaviour nothing checks. Rated high in security-relevant code, low elsewhere.</td></tr></table></div><h3>Secret bot</h3><p>Working tree <em>and</em> git history. A secret in an old commit is not gone just because the current file is clean.</p><div class="tabellenhuelle"><table><tr><th>Rule</th><th>Severity</th><th>What it means</th></tr><tr><td><code>aws-access-key-id</code><br><span class="leise">AWS access key ID in the source</span></td><td><span class="marke s-critical">critical</span></td><td>Treat the key as compromised: revoke it with the provider and issue a new one, then remove it from the source and supply it through a repository secret. Deleting a commit is not enough -- the history stays.</td></tr><tr><td><code>github-token</code><br><span class="leise">GitHub token in the source</span></td><td><span class="marke s-critical">critical</span></td><td>Treat the key as compromised: revoke it with the provider and issue a new one, then remove it from the source and supply it through a repository secret. Deleting a commit is not enough -- the history stays.</td></tr><tr><td><code>huggingface-token</code><br><span class="leise">Hugging Face token in the source</span></td><td><span class="marke s-critical">critical</span></td><td>Treat the key as compromised: revoke it with the provider and issue a new one, then remove it from the source and supply it through a repository secret. Deleting a commit is not enough -- the history stays.</td></tr><tr><td><code>anthropic-key</code><br><span class="leise">Anthropic API key in the source</span></td><td><span class="marke s-critical">critical</span></td><td>Treat the key as compromised: revoke it with the provider and issue a new one, then remove it from the source and supply it through a repository secret. Deleting a commit is not enough -- the history stays.</td></tr><tr><td><code>openai-key</code><br><span class="leise">OpenAI API key in the source</span></td><td><span class="marke s-critical">critical</span></td><td>Treat the key as compromised: revoke it with the provider and issue a new one, then remove it from the source and supply it through a repository secret. Deleting a commit is not enough -- the history stays.</td></tr><tr><td><code>slack-token</code><br><span class="leise">Slack token in the source</span></td><td><span class="marke s-critical">critical</span></td><td>Treat the key as compromised: revoke it with the provider and issue a new one, then remove it from the source and supply it through a repository secret. Deleting a commit is not enough -- the history stays.</td></tr><tr><td><code>google-api-key</code><br><span class="leise">Google API key in the source</span></td><td><span class="marke s-critical">critical</span></td><td>Treat the key as compromised: revoke it with the provider and issue a new one, then remove it from the source and supply it through a repository secret. Deleting a commit is not enough -- the history stays.</td></tr><tr><td><code>private-key-block</code><br><span class="leise">Private key in the source</span></td><td><span class="marke s-critical">critical</span></td><td>Generate a new key pair and revoke the old one. Private keys never belong in a repository, not even a private one.</td></tr><tr><td><code>assigned-credential</code><br><span class="leise">Credentials assigned to a variable</span></td><td><span class="marke s-high">high</span></td><td>Move the value into a repository secret and read it from the environment. If it is a placeholder, make that recognisable (e.g. `&lt;put-it-here&gt;` or `${VARIABLE}`).</td></tr></table></div><h3>Workflow bot</h3><p>The GitHub Actions themselves &mdash; the route by which somebody reaches a repository&rsquo;s secrets.</p><div class="tabellenhuelle"><table><tr><th>Rule</th><th>Severity</th><th>What it means</th></tr><tr><td><code>pull-request-target-checkout</code><br><span class="leise">pull_request_target checks out foreign code</span></td><td><span class="marke s-critical">critical</span></td><td>The workflow runs with the target repository's secrets and runs foreign code inside it. Anyone who can open a pull request takes over the run.</td></tr><tr><td><code>script-injection</code><br><span class="leise">Foreign text is substituted into a script</span></td><td><span class="marke s-high">high</span></td><td>A title or comment is substituted into a `run:` or `script:` block before execution. A backtick in it is then a command.</td></tr><tr><td><code>permissions-write-all</code><br><span class="leise">Workflow runs with every write permission</span></td><td><span class="marke s-high">high</span></td><td>Every step inherits it, a third-party action included.</td></tr><tr><td><code>unpinned-action</code><br><span class="leise">Action not pinned to a commit</span></td><td><span class="marke s-medium">medium</span></td><td>A tag can be moved. Then what runs with this repository's permissions changes. For `actions/*` this is only an informational note.</td></tr><tr><td><code>permissions-missing</code><br><span class="leise">Workflow does not set its permissions</span></td><td><span class="marke s-medium">medium</span></td><td>Without `permissions:` the repository defaults apply -- configured elsewhere and changeable without this file changing.</td></tr></table></div><h3>Dependency bot</h3><p>Eight lockfile formats against OSV.dev. If the query does not get through, the run ends with <b>2</b>: &bdquo;proves nothing&ldquo;, not &bdquo;clean&ldquo;.</p><div class="tabellenhuelle"><table><tr><th>Rule</th><th>Severity</th><th>What it means</th></tr><tr><td><code>known-vulnerability</code><br><span class="leise">Dependency with a known vulnerability</span></td><td><span class="marke s-high">high</span></td><td>According to OSV.dev at least one advisory affects this version. Chinook Security does not rate severity itself -- every known vulnerability is „high“, and rating is the overseer's job.</td></tr><tr><td><code>dependency-unpinned</code><br><span class="leise">Dependency is not pinned to a version</span></td><td><span class="marke s-low">low</span></td><td>Without `==` every run may install something different, and the check says nothing about what is installed. Only for `requirements.txt` -- a lockfile pins itself.</td></tr></table></div><h3>Code bot</h3><p>Patterns in the source. It sees <em>that</em> a dangerous spot is there &mdash; not <em>whether</em> anything foreign arrives at it.</p><div class="tabellenhuelle"><table><tr><th>Rule</th><th>Language</th><th>Severity</th><th>What it means</th></tr><tr><td><code>python-eval-exec</code><br><span class="leise">Text is executed as a program in Python</span></td><td>Python</td><td><span class="marke s-high">high</span></td><td>`eval` and `exec` run text as a program. If the text comes from a request, a file or an environment variable, the caller runs whatever they like.</td></tr><tr><td><code>python-subprocess-shell</code><br><span class="leise">subprocess lets the shell assemble the command</span></td><td>Python</td><td><span class="marke s-high">high</span></td><td>With the `shell` switch on, the command goes through the shell. A semicolon or a backtick in a substituted value is then a command of its own.</td></tr><tr><td><code>python-pickle-load</code><br><span class="leise">pickle loads foreign data</span></td><td>Python</td><td><span class="marke s-high">high</span></td><td>`pickle` executes source contained in the data while loading. A pickle file from a stranger is a program from a stranger.</td></tr><tr><td><code>python-yaml-unsafe</code><br><span class="leise">yaml.load without a safe loader</span></td><td>Python</td><td><span class="marke s-high">high</span></td><td>`yaml.load` without `Loader=SafeLoader` can construct arbitrary Python objects and execute source in the process.</td></tr><tr><td><code>python-tls-verify-off</code><br><span class="leise">TLS verification switched off</span></td><td>Python</td><td><span class="marke s-high">high</span></td><td>With `verify` set to false every certificate is accepted. The connection is encrypted, but the other end is anyone.</td></tr><tr><td><code>python-tempfile-mktemp</code><br><span class="leise">tempfile.mktemp creates a race condition</span></td><td>Python</td><td><span class="marke s-medium">medium</span></td><td>`mktemp` returns only a name. Between the name and the open, another process can create the file.</td></tr><tr><td><code>js-eval</code><br><span class="leise">Text is executed as a program in JavaScript</span></td><td>JavaScript / TypeScript</td><td><span class="marke s-high">high</span></td><td>Both run text as a program. If the text comes from an input, the sender runs whatever they like.</td></tr><tr><td><code>js-child-process-shell</code><br><span class="leise">child_process.exec with an assembled command</span></td><td>JavaScript / TypeScript</td><td><span class="marke s-high">high</span></td><td>`exec` hands the string to the shell. A substituted value therefore becomes source, not an argument.</td></tr><tr><td><code>js-innerhtml</code><br><span class="leise">Assignment to innerHTML</span></td><td>JavaScript / TypeScript</td><td><span class="marke s-medium">medium</span></td><td>Whatever is written here is parsed as HTML -- `&lt;script&gt;` and event attributes included. That is the classic route to XSS.</td></tr><tr><td><code>js-tls-verify-off</code><br><span class="leise">TLS verification switched off</span></td><td>JavaScript / TypeScript</td><td><span class="marke s-high">high</span></td><td>Every certificate is accepted; the other end is therefore anyone.</td></tr><tr><td><code>shell-curl-pipe-shell</code><br><span class="leise">What was downloaded is run straight away</span></td><td>Shell</td><td><span class="marke s-high">high</span></td><td>Whatever is at that address runs unchecked with the caller's permissions -- today, tomorrow, and after every change made there.</td></tr><tr><td><code>shell-eval</code><br><span class="leise">eval in a shell script</span></td><td>Shell</td><td><span class="marke s-medium">medium</span></td><td>`eval` reassembles the string as a command; substituted values become source.</td></tr></table></div><h3>Licence bot</h3><p>What is missing and what disagrees. It never states which licence something is under.</p><div class="tabellenhuelle"><table><tr><th>Rule</th><th>Severity</th><th>What it means</th></tr><tr><td><code>license-file-missing</code><br><span class="leise">No licence file in the root directory</span></td><td><span class="marke s-medium">medium</span></td><td>Without permission, in doubt: nothing.</td></tr><tr><td><code>license-undeclared</code><br><span class="leise">The package declares no licence</span></td><td><span class="marke s-medium">medium</span></td><td>Whoever depends on it cannot check whether they may.</td></tr><tr><td><code>license-link-broken</code><br><span class="leise">The declared licence points nowhere</span></td><td><span class="marke s-medium">medium</span></td><td>The file named does not exist -- there are no terms to read.</td></tr><tr><td><code>license-mismatch</code><br><span class="leise">Declaration and accompanying text disagree</span></td><td><span class="marke s-medium">medium</span></td><td>Which one applies is not for this bot to decide. License status requires verification.</td></tr><tr><td><code>license-unrecognised</code><br><span class="leise">Not a known SPDX identifier</span></td><td><span class="marke s-info">info</span></td><td>That does not mean it is wrong -- it means the bot cannot confirm it.</td></tr></table></div>
+
+<h2>The overseer</h2>
+<p>The AI layer. It rates every finding &mdash; <code>confirmed</code>, <code>probably-real</code>, <code>probably-noise</code>, <code>unclear</code> &mdash; and gives a
+sentence or two of reasoning.</p>
+<div class="merksatz">
+<p><strong>No finding gets lost.</strong> The model&rsquo;s answer can only attach a
+<code>triage</code> field to a finding. It cannot remove one, change a severity, or
+invent one.</p>
+<p>And that is in the code, not in the prompt: the result list is built from the
+<em>findings</em>, never from the answer. A guarantee that hangs on a model&rsquo;s
+obedience is not one.</p>
+</div>
+<div class="tabellenhuelle"><table>
+<tr><th>Property</th><th>Why</th></tr>
+<tr><td>It does not spend someone else&rsquo;s money</td>
+<td>The key comes from <code>CHINOOK_AI_TOKEN</code> in the repository of whoever runs
+it. Chinook Security holds none.</td></tr>
+<tr><td>It is optional</td>
+<td>Without a key everything else keeps running. A scanner that fails because a model
+did not answer is worse than none.</td></tr>
+<tr><td>No tools, no write access</td>
+<td>It inevitably reads foreign text. A model with tools reading such text is prompt
+injection with write access.</td></tr>
+</table></div>
+
+<h2>The counterproof</h2>
+<p>It copies the repository, breaks the bots <strong>on purpose</strong> &mdash;
+redaction switched off, a rule skipped, the network error swallowed, the overseer
+dropping findings &mdash; and demands that the checks go <strong>red</strong> as a
+result. If they stay green, the check is worthless, and the counterproof says so.</p>
+<p><strong>47 of 47 mutations caught.</strong> Baseline run: green.</p><div class="tabellenhuelle"><table><tr><th>Mutation</th><th>Result</th><th>What it breaks</th></tr><tr><td><code>redaction-off</code></td><td><span class="gefangen">caught</span></td><td>the bot prints the value it found</td></tr><tr><td><code>severity-check-removed</code></td><td><span class="gefangen">caught</span></td><td>a finding may carry an invented severity</td></tr><tr><td><code>threshold-never-fires</code></td><td><span class="gefangen">caught</span></td><td>a critical finding still leaves the run green</td></tr><tr><td><code>everything-is-a-placeholder</code></td><td><span class="gefangen">caught</span></td><td>every medium-confidence find is thrown away</td></tr><tr><td><code>first-rule-skipped</code></td><td><span class="gefangen">caught</span></td><td>a rule no longer runs</td></tr><tr><td><code>history-check-off</code></td><td><span class="gefangen">caught</span></td><td>a secret in the history stays undetected</td></tr><tr><td><code>everything-counts-as-pinned</code></td><td><span class="gefangen">caught</span></td><td>an action on a movable tag counts as pinned</td></tr><tr><td><code>no-context-is-untrusted</code></td><td><span class="gefangen">caught</span></td><td>script injection is no longer detected</td></tr><tr><td><code>missing-permissions-ignored</code></td><td><span class="gefangen">caught</span></td><td>a workflow without permissions counts as clean</td></tr><tr><td><code>pull-request-target-ignored</code></td><td><span class="gefangen">caught</span></td><td>the workflow bot's most severe finding disappears</td></tr><tr><td><code>exit-code-always-zero</code></td><td><span class="gefangen">caught</span></td><td>the bot reports a find but leaves the run green</td></tr><tr><td><code>osv-error-swallowed</code></td><td><span class="gefangen">caught</span></td><td>a failed query looks like a clean result</td></tr><tr><td><code>osv-answer-unchecked</code></td><td><span class="gefangen">caught</span></td><td>a shifted answer attributes the vulnerability to the wrong package</td></tr><tr><td><code>unpinned-version-counts-as-pinned</code></td><td><span class="gefangen">caught</span></td><td>a version range is queried as an exact version</td></tr><tr><td><code>unproven-counts-as-passed</code></td><td><span class="gefangen">caught</span></td><td>a run without an answer reports success</td></tr><tr><td><code>code-rule-skipped</code></td><td><span class="gefangen">caught</span></td><td>a code rule no longer runs</td></tr><tr><td><code>file-type-ignored</code></td><td><span class="gefangen">caught</span></td><td>Python rules fire in JavaScript and the other way round</td></tr><tr><td><code>licence-text-not-recognised</code></td><td><span class="gefangen">caught</span></td><td>the disagreement between declaration and licence file disappears</td></tr><tr><td><code>mismatch-ignored</code></td><td><span class="gefangen">caught</span></td><td>declared licence and accompanying text may disagree</td></tr><tr><td><code>dead-licence-link-ignored</code></td><td><span class="gefangen">caught</span></td><td>a licence reference pointing nowhere counts as fine</td></tr><tr><td><code>overseer-loses-findings</code></td><td><span class="gefangen">caught</span></td><td>the model's answer decides which findings remain</td></tr><tr><td><code>invented-fingerprint-accepted</code></td><td><span class="gefangen">caught</span></td><td>the model may invent findings and make up ratings</td></tr><tr><td><code>refusal-counts-as-result</code></td><td><span class="gefangen">caught</span></td><td>a refusal from the model looks like a rating</td></tr><tr><td><code>reasoning-unfiltered</code></td><td><span class="gefangen">caught</span></td><td>control characters from the model answer reach the report</td></tr><tr><td><code>require-has-no-effect</code></td><td><span class="gefangen">caught</span></td><td>--require demands a rating and accepts no answer</td></tr><tr><td><code>rule-missing-from-page</code></td><td><span class="gefangen">caught</span></td><td>the website omits a rule the bot applies</td></tr><tr><td><code>page-without-escaping</code></td><td><span class="gefangen">caught</span></td><td>foreign text reaches the HTML unfiltered</td></tr><tr><td><code>counterproof-massaged</code></td><td><span class="gefangen">caught</span></td><td>the page reports every mutation as caught, escaped ones included</td></tr><tr><td><code>package-block-not-recognised</code></td><td><span class="gefangen">caught</span></td><td>poetry.lock and Cargo.lock are no longer read at all</td></tr><tr><td><code>npm-name-includes-version</code></td><td><span class="gefangen">caught</span></td><td>yarn and pnpm ask about a package name that does not exist</td></tr><tr><td><code>pnpm-reads-whole-file</code></td><td><span class="gefangen">caught</span></td><td>pnpm settings are mistaken for packages</td></tr><tr><td><code>mutation-report-leaks-source</code></td><td><span class="gefangen">caught</span></td><td>the mutation report carries the source it replaced, secrets included</td></tr><tr><td><code>js-comments-get-mutated</code></td><td><span class="gefangen">caught</span></td><td>a change inside a comment is reported as a gap in the tests</td></tr><tr><td><code>js-strings-get-mutated</code></td><td><span class="gefangen">caught</span></td><td>a change inside a string literal is reported as a gap in the tests</td></tr><tr><td><code>red-baseline-accepted</code></td><td><span class="gefangen">caught</span></td><td>an already broken test suite is mutated, and every mutation counts as caught</td></tr><tr><td><code>source-left-broken</code></td><td><span class="gefangen">caught</span></td><td>the bot leaves someone else's source code mutated on disk</td></tr><tr><td><code>test-files-get-mutated</code></td><td><span class="gefangen">caught</span></td><td>the test suite is mutated against itself, which measures nothing</td></tr><tr><td><code>security-priority-dropped</code></td><td><span class="gefangen">caught</span></td><td>the budget is spent away from security-relevant code</td></tr><tr><td><code>one-file-eats-the-budget</code></td><td><span class="gefangen">caught</span></td><td>a single large file uses up the whole budget and the rest goes unchecked</td></tr><tr><td><code>timeout-counts-as-passing</code></td><td><span class="gefangen">caught</span></td><td>a mutation that hangs the test run is reported as an untested behaviour</td></tr><tr><td><code>severity-heuristic-flattened</code></td><td><span class="gefangen">caught</span></td><td>a surviving mutation in security-relevant code is rated as low</td></tr><tr><td><code>bot-count-written-by-hand</code></td><td><span class="gefangen">caught</span></td><td>the page states a bot count that no longer matches the source</td></tr><tr><td><code>bot-missing-from-page</code></td><td><span class="gefangen">caught</span></td><td>a whole bot disappears from the page without a check going red</td></tr><tr><td><code>broken-yaml-block-accepted</code></td><td><span class="gefangen">caught</span></td><td>an action file GitHub cannot even load counts as fine</td></tr><tr><td><code>yaml-check-sees-nothing</code></td><td><span class="gefangen">caught</span></td><td>the YAML check passes because it looked at no file at all</td></tr><tr><td><code>missing-positive-control-ignored</code></td><td><span class="gefangen">caught</span></td><td>a test command that never reacts to a change looks like weak tests</td></tr><tr><td><code>missing-control-still-passes</code></td><td><span class="gefangen">caught</span></td><td>an unreadable run reports findings instead of ending with 2</td></tr></table></div>
+
+<h2>The finding format</h2>
+<p>Every bot emits the same thing &mdash; as JSON and as SARIF for GitHub&rsquo;s
+security view. Without it neither the overseer nor this page could be built, because
+both read findings and not tool output.</p>
+<p>Fields per finding: <code>id</code>, <code>bot</code>, <code>rule</code>, <code>title</code>, <code>severity</code>, <code>confidence</code>, <code>location</code>, <code>explanation</code>, <code>remediation</code>, <code>evidence</code>, <code>fingerprint</code>.</p>
+<p><code>evidence</code> describes a find without reproducing it &mdash; no prefix, no
+hash, only rule and length. A prefix would be a leak for a password, a hash an oracle
+for a weak one, and in a public repository anyone can read the action log.</p>
+
+<h2>What Chinook Security does not promise</h2>
+<ul>
+<li><strong>Completeness.</strong> No finding does not mean &bdquo;secure&ldquo;, it
+means &bdquo;these rules found nothing&ldquo;.</li>
+<li><strong>No false positives.</strong> Several rules run at medium confidence and
+are sometimes wrong.</li>
+<li><strong>No detection rates.</strong> There are no percentages here, because there
+is no measurement backing them.</li>
+<li><strong>No legal advice</strong> and no severity rating of its own.</li>
+</ul>
+<p>The limits in detail are in
+<a href="https://github.com/Pheonix-Studio-cat/Chinook-security/blob/main/docs/grenzen.md"><code>docs/grenzen.md</code></a> (German)
+&mdash; that file matters more than a feature list.</p>
+
+<footer>
+<p>Chinook Security &mdash; <a href="https://github.com/Pheonix-Studio-cat/Chinook-security">github.com/Pheonix-Studio-cat/Chinook-security</a> &middot;
+MIT &middot; PH&Ouml;NIX STUDIO.
+This page is generated from the source, not maintained by hand: every rule above
+comes from the bot that applies it.</p>
+</footer>
+
+</div>
+</body>
+</html>
