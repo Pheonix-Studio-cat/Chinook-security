@@ -34,11 +34,11 @@ findings and keeps the bots honest, the **website** and the **weekly run**.
 | **Counterproof bot** | ✅ breaks your code, runs your tests, reports what stayed green |
 | Composite action per bot | ✅ proven from a foreign repository too |
 | **Overseer** (AI layer) | ✅ triages, never removes |
-| Counterproof | ✅ 43 mutations, all caught |
+| Counterproof | ✅ 45 mutations, all caught |
 | **Website** | ✅ generated from the source, GitHub Pages |
 | **Weekly run** | ✅ Mondays, without a commit |
 
-**203 checks, all green. 43 mutations, all caught.**
+**210 checks, all green. 45 mutations, all caught.**
 
 **No dependencies.** The Python standard library only. A security tool with
 three hundred transitive packages is an attack surface itself, and a lockfile
@@ -387,7 +387,7 @@ python3 -m checks.counterproof [--json counterproof.json]
 It copies the repository, breaks the bots **on purpose** — redaction switched
 off, a rule skipped, `is_pinned` always returning `True`, the OSV error
 swallowed, the overseer dropping findings — and demands that the checks go
-**red** as a result. Forty-three mutations, all caught.
+**red** as a result. Forty-five mutations, all caught.
 
 Each mutation first verifies that it changed the file at all, and that the text
 it replaces occurs **exactly once**. Without the first, an ineffective mutation

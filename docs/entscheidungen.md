@@ -419,6 +419,39 @@ umfallen und gilt als gefangen -- das kostet Budget, meldet aber nichts
 Falsches. Gefaehrlich waere der andere Fall, und deshalb werden Kommentare und
 Zeichenketten ausgelassen, lieber einmal zu oft.
 
+### Die Action war kein gueltiges YAML -- und meine Pruefung sagte, sie sei es
+
+Der erste Lauf in einer echten GitHub Action ist gescheitert, und zwar in
+sechs Sekunden:
+
+    (Line: 108, Col: 1) While scanning a simple key, could not find expected ':'
+    Failed to load .../actions/counterproof/action.yml
+
+In `action.yml` stand ein mehrzeiliges Python-Skript innerhalb eines
+`run: |`-Blocks, und seine Zeilen begannen auf **Spalte 0**. YAML beendet
+einen Block-Skalar bei der ersten Zeile, die nicht tiefer eingerueckt ist als
+der Schluessel -- aus `import json, sys` wurde ein Schluessel auf oberster
+Ebene.
+
+**Geprueft hatte ich das vorher.** Meine Pruefung suchte nach Zeichenketten
+(`"name:" in text`, `"run:" in text`) und fand sie alle -- in einer Datei, die
+GitHub nicht einmal einlesen konnte. Gruen, und ohne jede Aussage. Zusaetzlich
+lief der Workflow-Bot darueber und meldete null Befunde; auch er ist
+zeilenweise und prueft Sicherheit, nicht Ladbarkeit.
+
+Der Fehler ist in vier fremde Repos gelangt, bevor er auffiel.
+
+Die Antwort ist `checks/test_yaml_bloecke.py`: kein Parser (den gibt es in der
+Standardbibliothek nicht, und eine Abhaengigkeit kommt nicht in Frage),
+sondern **genau diese Fehlerklasse**, zeilenweise, ueber jede `.yml` im Repo.
+Nachgewiesen an der kaputten Fassung aus dem Commit: sie wird gefangen, die
+reparierte nicht. Zwei Mutationen halten die Pruefung fest -- eine dreht sie
+ab, die andere laesst sie auf null Dateien schauen.
+
+> *Der Einbau einer Datei zu pruefen heisst, sie einbauen zu lassen. Dass die
+> erwarteten Woerter darin vorkommen, sagt nichts darueber, ob sie geladen
+> werden kann.*
+
 ### Was der neue Bot nebenbei aufgedeckt hat
 
 Die Seite schrieb **"5 bots" von Hand** -- auf einer Seite, deren erklaerter

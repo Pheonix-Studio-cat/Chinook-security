@@ -377,6 +377,22 @@ MUTATIONEN: tuple[Mutation, ...] = (
         neu="BOTS = (\n    (\n        secret_bot,",
         trifft="a whole bot disappears from the page without a check going red",
     ),
+    # --- Die YAML-Pruefung. Ihre Vorgaengerin suchte nur nach Zeichenketten
+    # und war gruen an einer Datei, die GitHub nicht laden konnte.
+    Mutation(
+        name="broken-yaml-block-accepted",
+        datei="checks/test_yaml_bloecke.py",
+        alt="            if not STRUKTURZEILE.match(zeile):\n                fehler.append((i + 1, zeile))",
+        neu="            if False:\n                fehler.append((i + 1, zeile))",
+        trifft="an action file GitHub cannot even load counts as fine",
+    ),
+    Mutation(
+        name="yaml-check-sees-nothing",
+        datei="checks/test_yaml_bloecke.py",
+        alt='            if datei.endswith((".yml", ".yaml")):',
+        neu='            if False:',
+        trifft="the YAML check passes because it looked at no file at all",
+    ),
 )
 
 

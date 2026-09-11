@@ -103,12 +103,11 @@ runs:
         # Die Deckung gehoert zum Ergebnis. `0 entkommen` heisst nur dann
         # etwas, wenn danebensteht, wie viel ueberhaupt gemessen wurde.
         if [ -f "$CHINOOK_REPORT" ]; then
-          werte=$(python3 -c '
-import json, sys
-bericht = json.load(open(sys.argv[1]))
-ziel = bericht.get("target", {})
-print(bericht["summary"]["total"], ziel.get("mutations_caught", 0), ziel.get("mutations_run", 0))
-' "$CHINOOK_REPORT")
+          # Einzeiler mit Semikolons statt eines mehrzeiligen Skripts: eine
+          # Zeile auf Spalte 0 beendet den YAML-Block, und dann laedt GitHub
+          # diese Datei gar nicht erst. Genau daran ist die erste Fassung
+          # gescheitert.
+          werte=$(python3 -c 'import json,sys; b=json.load(open(sys.argv[1])); z=b.get("target",{}); print(b["summary"]["total"], z.get("mutations_caught",0), z.get("mutations_run",0))' "$CHINOOK_REPORT")
           read -r gesamt gefangen gelaufen <<<"$werte"
         else
           gesamt=0; gefangen=0; gelaufen=0
