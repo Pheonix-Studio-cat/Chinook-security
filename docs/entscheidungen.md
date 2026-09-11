@@ -359,3 +359,74 @@ JSON-Schema. Beides ist jetzt englisch. Die Lehre steht im Gedächtnis-Repo als
 Fehler Nr. 19: *wer die Ausgabe eines Werkzeugs übersetzt, ruft das Werkzeug
 danach auf.* Den Quelltext zu lesen genügt nicht — `help="..."` sieht nicht wie
 Prosa aus.
+
+---
+
+## Der Gegenproben-Bot: das eigene Verfahren nach aussen gedreht
+
+Die Gegenprobe war von Anfang an das, was Chinook Security von anderen
+Sicherheitswerkzeugen unterscheidet -- und sie prueft bis jetzt nur die eigenen
+Bots. Der Gegenproben-Bot richtet dasselbe Verfahren auf ein **fremdes** Repo:
+er bricht dessen Code absichtlich und laesst dessen eigene Tests laufen.
+
+**Warum das ein Sicherheitsbefund ist und nicht bloss ein Testwerkzeug.** Jeder
+andere Bot hier sagt, was im Code steht. Dieser sagt, was die Pruefungen nicht
+merken wuerden. Eine gruene Pruefsuite, die eine entschaerfte
+Berechtigungspruefung durchwinkt, sieht genauso aus wie eine, die sie faengt --
+und genau diese Sorte Luecke ist die teure.
+
+### Vier Entscheidungen, die dabei fielen
+
+**1. Rote Vorlage heisst 2, nicht 0.** Laeuft die Pruefsuite schon vorher rot,
+ist "gefangen" nicht von "war schon kaputt" zu unterscheiden. Der Bot mutiert
+dann gar nicht erst und meldet `Unprovable`. Dasselbe bei fehlendem
+Testkommando und bei nichts Mutierbarem.
+
+**2. Der Befund traegt nie den Quelltext.** In `if token == "..."` steckt ein
+Geheimnis, und der Bericht landet in einem fremden Action-Log. Gemeldet werden
+Ort und Operator. Die erste Fassung verletzte das: `return-forced-true` schrieb
+den urspruenglichen Rueckgabeausdruck mit. Gefangen hat es eine Pruefung, die
+genau danach sucht -- sie steht jetzt in der allgemeinen Fassung da und gilt
+fuer **jeden** kuenftigen Operator, nicht nur den einen bekannten Fall.
+
+**3. Keine Shell.** Der Bot bekommt ein Kommando von aussen und fuehrt es aus --
+das ist sein Zweck. Die Shell dazwischen liess sich aber vermeiden, und der
+eigene Code-Bot hat das angemahnt, als sie noch mitlief. Die Regel zu
+entschaerfen waere der falsche Weg gewesen; `shlex.split` und ein Aufruf ohne
+Shell haben nichts gekostet: `npm test`, `vitest run`, `bash tests/run.sh`,
+`python3 -m unittest discover` brauchen keine. Wer wirklich eine will, schreibt
+`sh -c "..."` hin und sieht sie dann auch in seiner Workflow-Datei stehen.
+
+**4. Die Auswahl ist bestimmt, nicht zufaellig.** Zwei Laeufe ueber denselben
+Stand pruefen dieselben Mutationen, sicherheitsnahe zuerst. Reihum ueber die
+Dateien, damit eine einzige grosse nicht das ganze Budget frisst und der Rest
+ungeprueft bleibt, ohne dass es auffaellt. Ein Bot, der jedes Mal etwas anderes
+misst, ist in einer CI nicht zu gebrauchen.
+
+### Python ueber den Syntaxbaum, JavaScript zeilenweise
+
+Fuer Python sagt `ast` (Standardbibliothek, also keine Abhaengigkeit), **wo**
+etwas steht; ersetzt wird im Text. `ast.unparse` wuerde die ganze Datei neu
+schreiben und dabei Kommentare und Formatierung verlieren -- das waere ein
+zweiter, ungewollter Unterschied, und ein zweiter Unterschied macht die Messung
+wertlos.
+
+Fuer JavaScript und TypeScript gibt es keinen Parser in der
+Standardbibliothek. Also zeilenweise, dieselbe Entscheidung wie beim
+Workflow-Bot. Der Preis ist Genauigkeit, und er wird bewusst in die **sichere**
+Richtung bezahlt: eine Mutation, die Unsinn erzeugt, laesst die Pruefsuite
+umfallen und gilt als gefangen -- das kostet Budget, meldet aber nichts
+Falsches. Gefaehrlich waere der andere Fall, und deshalb werden Kommentare und
+Zeichenketten ausgelassen, lieber einmal zu oft.
+
+### Was der neue Bot nebenbei aufgedeckt hat
+
+Die Seite schrieb **"5 bots" von Hand** -- auf einer Seite, deren erklaerter
+Punkt es ist, aus der Quelle erzeugt und nicht gepflegt zu sein. Ebenso die
+Liste der Bot-Module in der zugehoerigen Pruefung. Beides ist jetzt abgeleitet,
+und zwei Mutationen halten es fest.
+
+Und zwei bestehende Mutationen waren **mehrdeutig**: ihr Suchtext kam mehrfach
+in `cli.py` vor, `replace(..., 1)` traf die erste Stelle statt der gemeinten.
+Eine davon war es von Anfang an. Die Gegenprobe weist Mehrdeutigkeit jetzt
+zurueck, statt sie stillschweigend hinzunehmen.

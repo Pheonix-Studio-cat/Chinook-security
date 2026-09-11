@@ -1,0 +1,122 @@
+name: "Chinook Security Counterproof-Bot"
+description: >-
+  Bricht deinen Code absichtlich und laesst deine eigenen Tests laufen. Was gruen
+  bleibt, ist ein Verhalten, das niemand prueft -- die Luecke, die wie Erfolg aussieht.
+author: "PHÖNIX STUDIO"
+
+inputs:
+  test-command:
+    description: >-
+      Das Kommando, das deine Tests ausfuehrt, z. B. `npm test`, `vitest run`
+      oder `python3 -m unittest discover`. Pflicht: ohne Tests gibt es nichts
+      gegenzupruefen, und der Schritt endet mit 2 statt mit 0.
+    required: true
+  path:
+    description: "Wurzel des zu pruefenden Verzeichnisses."
+    required: false
+    default: "."
+  exclude:
+    description: "Pfade, die uebersprungen werden, kommagetrennt."
+    required: false
+    default: ""
+  budget:
+    description: >-
+      Wie viele Mutationen gelaufen werden. Jede kostet einen vollen Testlauf --
+      das ist die Stellschraube zwischen Laufzeit und Deckung.
+    required: false
+    default: "20"
+  test-timeout:
+    description: "Sekunden, die ein einzelner Testlauf dauern darf."
+    required: false
+    default: "600"
+  fail-on:
+    description: >-
+      Ab welchem Schweregrad der Schritt fehlschlaegt. Entkommene Mutationen in
+      sicherheitsnahem Code sind `high`, alle anderen `low`.
+    required: false
+    default: "high"
+  report:
+    description: "Wohin der JSON-Bericht geschrieben wird."
+    required: false
+    default: "chinook-counterproof-bot.json"
+  sarif:
+    description: "Wohin der SARIF-Bericht geschrieben wird. Leer lassen, um keinen zu schreiben."
+    required: false
+    default: "chinook-counterproof-bot.sarif"
+
+outputs:
+  report:
+    description: "Pfad des JSON-Berichts."
+    value: ${{ steps.lauf.outputs.report }}
+  total:
+    description: "Anzahl der entkommenen Mutationen."
+    value: ${{ steps.lauf.outputs.total }}
+  caught:
+    description: "Wie viele Mutationen gefangen wurden."
+    value: ${{ steps.lauf.outputs.caught }}
+  run:
+    description: "Wie viele Mutationen ueberhaupt liefen. Ohne diese Zahl sagt `total` nichts."
+    value: ${{ steps.lauf.outputs.run }}
+
+runs:
+  using: composite
+  steps:
+    - id: lauf
+      shell: bash
+      # Die Eingaben gehen ueber `env` in das Skript, nicht ueber ${{ }} im
+      # Skripttext -- genau das, was der Workflow-Bot bei anderen anmahnt.
+      # Hier wiegt es schwerer als sonst: `test-command` ist ein Kommando, das
+      # ausgefuehrt wird. Eingesetzt in den Skripttext waere es eine
+      # Einladung zur Befehlsverkettung.
+      env:
+        CHINOOK_PATH: ${{ inputs.path }}
+        CHINOOK_TEST_COMMAND: ${{ inputs.test-command }}
+        CHINOOK_EXCLUDE: ${{ inputs.exclude }}
+        CHINOOK_BUDGET: ${{ inputs.budget }}
+        CHINOOK_TEST_TIMEOUT: ${{ inputs.test-timeout }}
+        CHINOOK_FAIL_ON: ${{ inputs.fail-on }}
+        CHINOOK_REPORT: ${{ inputs.report }}
+        CHINOOK_SARIF: ${{ inputs.sarif }}
+        PYTHONPATH: ${{ github.action_path }}/../..
+      run: |
+        set -euo pipefail
+        argumente=(
+          counterproof-bot
+          --path "$CHINOOK_PATH"
+          --test-command "$CHINOOK_TEST_COMMAND"
+          --budget "$CHINOOK_BUDGET"
+          --test-timeout "$CHINOOK_TEST_TIMEOUT"
+          --fail-on "$CHINOOK_FAIL_ON"
+        )
+        if [ -n "$CHINOOK_EXCLUDE" ]; then
+          argumente+=(--exclude "$CHINOOK_EXCLUDE")
+        fi
+        if [ -n "$CHINOOK_REPORT" ]; then
+          argumente+=(--json "$CHINOOK_REPORT")
+        fi
+        if [ -n "$CHINOOK_SARIF" ]; then
+          argumente+=(--sarif "$CHINOOK_SARIF")
+        fi
+        echo "report=$CHINOOK_REPORT" >> "$GITHUB_OUTPUT"
+        status=0
+        python3 -m chinook.cli "${argumente[@]}" || status=$?
+        # Die Deckung gehoert zum Ergebnis. `0 entkommen` heisst nur dann
+        # etwas, wenn danebensteht, wie viel ueberhaupt gemessen wurde.
+        if [ -f "$CHINOOK_REPORT" ]; then
+          werte=$(python3 -c '
+import json, sys
+bericht = json.load(open(sys.argv[1]))
+ziel = bericht.get("target", {})
+print(bericht["summary"]["total"], ziel.get("mutations_caught", 0), ziel.get("mutations_run", 0))
+' "$CHINOOK_REPORT")
+          read -r gesamt gefangen gelaufen <<<"$werte"
+        else
+          gesamt=0; gefangen=0; gelaufen=0
+        fi
+        echo "total=$gesamt" >> "$GITHUB_OUTPUT"
+        echo "caught=$gefangen" >> "$GITHUB_OUTPUT"
+        echo "run=$gelaufen" >> "$GITHUB_OUTPUT"
+        # Rueckgabewert 2 heisst: der Lauf konnte nichts feststellen -- keine
+        # Tests, rote Vorlage, kein mutierbarer Quelltext. Er wird
+        # durchgereicht, damit er nicht als bestanden durchgeht.
+        exit "$status"

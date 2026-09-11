@@ -113,8 +113,16 @@ MUTATIONEN: tuple[Mutation, ...] = (
     Mutation(
         name="exit-code-always-zero",
         datei="chinook/cli.py",
-        alt="    if fmt.exceeds(results, args.fail_on):",
-        neu="    if False:",
+        alt=(
+            "    if fmt.exceeds(results, args.fail_on):\n"
+            "        print(\n"
+            "            f\"\\nFailed: at least one finding reaches the threshold \""
+        ),
+        neu=(
+            "    if False:\n"
+            "        print(\n"
+            "            f\"\\nFailed: at least one finding reaches the threshold \""
+        ),
         trifft="the bot reports a find but leaves the run green",
     ),
     Mutation(
@@ -141,8 +149,24 @@ MUTATIONEN: tuple[Mutation, ...] = (
     Mutation(
         name="unproven-counts-as-passed",
         datei="chinook/cli.py",
-        alt="        return UNBEWIESEN",
-        neu="        return OK",
+        # Eindeutig verankert. Vorher stand hier nur `return UNBEWIESEN`,
+        # und das kam schon damals dreimal in der Datei vor -- die Mutation
+        # traf die erste Stelle, nicht die gemeinte. Gefangen wurde sie
+        # trotzdem, aber sie mass etwas anderes, als ihr Name sagt.
+        alt=(
+            "            \"This run says nothing about whether vulnerabilities are present. \"\n"
+            "            \"It therefore does not count as passing.\",\n"
+            "            file=sys.stderr,\n"
+            "        )\n"
+            "        return UNBEWIESEN"
+        ),
+        neu=(
+            "            \"This run says nothing about whether vulnerabilities are present. \"\n"
+            "            \"It therefore does not count as passing.\",\n"
+            "            file=sys.stderr,\n"
+            "        )\n"
+            "        return OK"
+        ),
         trifft="a run without an answer reports success",
     ),
     Mutation(
@@ -256,6 +280,102 @@ MUTATIONEN: tuple[Mutation, ...] = (
         alt="        if not im_paketteil:",
         neu="        if False:",
         trifft="pnpm settings are mistaken for packages",
+    ),    # --- Gegenproben-Bot: der Bot, der fremden Code bricht, wird selbst
+    # gebrochen. Waere er es nicht, waere er der einzige hier, dem man auf
+    # sein Wort glauben muesste.
+    Mutation(
+        name="mutation-report-leaks-source",
+        datei="chinook/counterproof_bot.py",
+        alt="            wandel=wandel or f\"{alt} -> {neu_text}\", neu=neu,",
+        neu="            wandel=f\"{alt} -> {neu_text}\", neu=neu,",
+        trifft="the mutation report carries the source it replaced, secrets included",
+    ),
+    Mutation(
+        name="js-comments-get-mutated",
+        datei="chinook/counterproof_bot.py",
+        alt="        if in_blockkommentar:",
+        neu="        if False:",
+        trifft="a change inside a comment is reported as a gap in the tests",
+    ),
+    Mutation(
+        name="js-strings-get-mutated",
+        datei="chinook/counterproof_bot.py",
+        alt="    raus = list(zeile)",
+        neu="    return zeile",
+        trifft="a change inside a string literal is reported as a gap in the tests",
+    ),
+    Mutation(
+        name="red-baseline-accepted",
+        datei="chinook/counterproof_bot.py",
+        alt="    if not laeufer(testkommando, wurzel, zeitgrenze):",
+        neu="    if False:",
+        trifft="an already broken test suite is mutated, and every mutation counts as caught",
+    ),
+    Mutation(
+        name="source-left-broken",
+        datei="chinook/counterproof_bot.py",
+        alt="                griff.write(vorlage)",
+        neu="                pass",
+        trifft="the bot leaves someone else's source code mutated on disk",
+    ),
+    Mutation(
+        name="test-files-get-mutated",
+        datei="chinook/counterproof_bot.py",
+        alt="            if ist_testdatei(relativ):",
+        neu="            if False:",
+        trifft="the test suite is mutated against itself, which measures nothing",
+    ),
+    Mutation(
+        name="security-priority-dropped",
+        datei="chinook/counterproof_bot.py",
+        # Zielt auf die Gruppierung, nicht auf die Sortierung. Der Vorrang
+        # steht an zwei Stellen; die Sortierung allein zu mutieren aenderte
+        # das Ergebnis nicht, weil die Gruppierung ihn weiter durchsetzte --
+        # eine Mutation, die den Text aendert und das Verhalten nicht. Sie
+        # kam durch, und das lag an ihr, nicht an der Pruefung.
+        alt='        nach_datei.setdefault((not mutation.sicherheitsnah, mutation.pfad), []).append(mutation)',
+        neu='        nach_datei.setdefault((mutation.pfad,), []).append(mutation)',
+        trifft="the budget is spent away from security-relevant code",
+    ),
+    Mutation(
+        name="one-file-eats-the-budget",
+        datei="chinook/counterproof_bot.py",
+        # Die erste Fassung hing nur Bedingungen an, die ohnehin wahr waren --
+        # eine Mutation, die den Text aendert und das Verhalten nicht. Sie kam
+        # durch, und das lag an ihr, nicht an der Pruefung.
+        alt="        for schluessel in sorted(nach_datei):",
+        neu="        for schluessel in sorted(nach_datei)[:1]:",
+        trifft="a single large file uses up the whole budget and the rest goes unchecked",
+    ),
+    Mutation(
+        name="timeout-counts-as-passing",
+        datei="chinook/counterproof_bot.py",
+        alt="    except subprocess.TimeoutExpired:\n        return False",
+        neu="    except subprocess.TimeoutExpired:\n        return True",
+        trifft="a mutation that hangs the test run is reported as an untested behaviour",
+    ),
+    Mutation(
+        name="severity-heuristic-flattened",
+        datei="chinook/counterproof_bot.py",
+        alt='        severity="high" if nah else "low",',
+        neu='        severity="low",',
+        trifft="a surviving mutation in security-relevant code is rated as low",
+    ),
+    # --- Die Website darf nicht von der Quelle abweichen. Beide Zahlen hier
+    # standen bis zum sechsten Bot von Hand da und konnten still veralten.
+    Mutation(
+        name="bot-count-written-by-hand",
+        datei="webseite/build.py",
+        alt='        (str(len(BOTS)), "bots"),',
+        neu='        ("5", "bots"),',
+        trifft="the page states a bot count that no longer matches the source",
+    ),
+    Mutation(
+        name="bot-missing-from-page",
+        datei="webseite/build.py",
+        alt="BOTS = (\n    (\n        counterproof_bot,",
+        neu="BOTS = (\n    (\n        secret_bot,",
+        trifft="a whole bot disappears from the page without a check going red",
     ),
 )
 
@@ -298,8 +418,16 @@ def pruefe(mutation: Mutation) -> tuple[bool, str]:
         ziel = _ziel(handle)
         datei = ziel / mutation.datei
         original = datei.read_text(encoding="utf-8")
-        if mutation.alt not in original:
+        treffer = original.count(mutation.alt)
+        if treffer == 0:
             return False, "der zu mutierende Text steht nicht in der Datei"
+        if treffer > 1:
+            # Mehrdeutig ist so schlimm wie gar nicht gefunden: `replace(.., 1)`
+            # nimmt dann irgendeine Stelle, und die Mutation prueft etwas
+            # anderes, als ihr Name sagt. Beim sechsten Bot ist genau das
+            # passiert -- eine neue Funktion in `cli.py` hat zwei bestehende
+            # Mutationen still auf sich gezogen.
+            return False, f"der zu mutierende Text steht {treffer}-mal in der Datei"
         veraendert = original.replace(mutation.alt, mutation.neu, 1)
         # Ohne diese Zusicherung kann eine Mutation nichts aendern und die
         # Gegenprobe faellt trotzdem ein Urteil.
