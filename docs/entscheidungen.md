@@ -499,6 +499,13 @@ zurueck, statt sie stillschweigend hinzunehmen.
 
 ## Claude auf Zuruf, und ein Dauerauftrag
 
+> ⚠️ **Am selben Tag zurueckgenommen.** Der Projektinhaber hat entschieden,
+> nichts zu bezahlen; `.github/workflows/claude.yml` und
+> `.github/dauerauftrag.md` sind wieder entfernt. Was ersatzweise da ist,
+> steht weiter unten unter *Kostenlos statt bezahlt*. Der Abschnitt hier
+> bleibt stehen, weil die Begruendungen darin weiter gelten -- besonders die
+> ueber annotierte Tags, die nichts mit dem Preis zu tun hat.
+
 Seit dem 2026-09-15 liegt `.github/workflows/claude.yml` im Repo: ein
 **Textfeld** im Actions-Reiter, in das der Projektinhaber schreibt, was zu tun
 ist. Das Ergebnis kommt als Pull Request. Dazu ein Dauerauftrag in
@@ -545,3 +552,63 @@ angenommen.
 
 **Die Regel:** *beim Holen eines Commits zu einem Tag immer nach der
 `^{}`-Zeile sehen; gibt es sie, ist sie die richtige.*
+
+---
+
+## Kostenlos statt bezahlt: GitHub Models
+
+Am 2026-09-15, wenige Stunden nach dem Merge des bezahlten Wegs, war die
+Ansage eindeutig: **es wird nichts bezahlt.** Damit war
+`.github/workflows/claude.yml` nicht nur ungenutzt, sondern schaedlich -- der
+Zeitplan darin haette **jeden Montag einen roten Lauf** erzeugt, mit der
+Meldung, dass `ANTHROPIC_API_KEY` fehlt. Ein rot blinkendes Repo, in dem nichts
+kaputt ist, gewoehnt einen daran, Rot zu uebersehen.
+
+An seiner Stelle stehen jetzt zwei Workflows, die auf **GitHub Models** laufen:
+der eingebaute `GITHUB_TOKEN` genuegt, dazu das eine Recht `models: read`.
+Kein Schluessel, kein zweites Konto.
+
+| Datei | Was sie ist |
+| --- | --- |
+| `.github/workflows/frag-die-ki.yml` | der Knopf: ein Textfeld unter *Run workflow*, Antwort in der Zusammenfassung |
+| `.github/workflows/ki-wochenbericht.yml` | der wiederkehrende Auftrag: montags messen, einordnen lassen, bei Auffaelligem ein Issue |
+
+### Was dabei fast schiefgegangen waere: v3 ist nicht mehr GitHub Models
+
+Die erste Fassung stand auf `actions/ai-inference@v3` -- die neueste, also
+scheinbar die richtige. **Ab v3 ruft diese Action aber gar nicht mehr GitHub
+Models auf.** Sie startet die **Copilot-CLI**, die auf dem Runner erst per
+`npm install -g @github/copilot` installiert und mit einem eigenen Token
+(`COPILOT_GITHUB_TOKEN`) angemeldet sein muss. Ohne beides faellt der Lauf um;
+mit beidem waere es genau das zweite Konto, das vermieden werden sollte.
+
+`models: read` haette in v3 **gar nichts bewirkt**. Der Workflow haette
+plausibel ausgesehen und nie funktioniert.
+
+Gefunden nur, weil die `action.yml` **an genau dem festgelegten Commit**
+nachgelesen wurde, statt sich auf die Erinnerung an frueheres v1-Verhalten zu
+verlassen. Festgelegt ist jetzt **v2.1.1**
+(`a7805884c80886efc241e94a5351df715968a0ad`) -- die letzte Fassung, die mit
+dem eingebauten Token an `https://models.github.ai/inference` geht.
+
+**Die Regel daraus:** bei einer fremden Action ist die Versionsnummer keine
+Auskunft ueber das Verhalten. Ein Hauptversionssprung kann den Anbieter
+austauschen, ohne dass die Eingabefelder sich sichtbar aendern.
+
+### Und: `max-tokens` steht auf 200
+
+Der eingebaute Standard der Action sind **200 Tokens** Antwortlaenge. Das
+reicht fuer einen halben Absatz und schneidet mitten im Satz ab -- eine
+Antwort, die aussieht wie eine. Beide Workflows setzen deshalb
+`max-completion-tokens` ausdruecklich.
+
+### Die Messung entscheidet, nicht das Modell
+
+Im Wochenbericht rechnet **Python** die Zahlen aus; das Modell bekommt sie
+vorgelegt und sagt, was daran Aufmerksamkeit verdient. **Ob ein Issue
+aufgeht, haengt allein an der Messung.** Sonst haenge eine Entscheidung an
+einem Satz, den ein Modell beim naechsten Mal anders formuliert.
+
+Geprueft ist beides: mit den echten Zahlen meldet der Schritt `nein`, und mit
+einer von Hand auf 999 verstellten README-Zahl meldet er `ja`. Eine Pruefung,
+die nur den gruenen Fall gesehen hat, hat nichts bewiesen.

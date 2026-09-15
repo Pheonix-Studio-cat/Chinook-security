@@ -38,7 +38,7 @@ findings and keeps the bots honest, the **website** and the **weekly run**.
 | **Website** | ✅ generated from the source, GitHub Pages |
 | **Weekly run** | ✅ Mondays, without a commit |
 
-**216 checks, all green. 47 mutations, all caught.**
+**220 checks, all green. 47 mutations, all caught.**
 
 **No dependencies.** The Python standard library only. A security tool with
 three hundred transitive packages is an attack surface itself, and a lockfile
@@ -413,26 +413,31 @@ without anyone having to commit anything. It catches what changes **without a
 commit** — a new advisory at OSV, a changed default in GitHub Actions, a tool
 that answers differently than last week.
 
-## Claude on demand
+## Ask the AI
 
-`.github/workflows/claude.yml` puts a **text field** in the Actions tab:
-*Actions → Claude → Run workflow*. Type what Claude should do in this
-repository, press start, and the result arrives as a pull request. No terminal
-needed — which is the point, because this project is maintained from an iPad.
+`.github/workflows/frag-die-ki.yml` puts a **text field** in the Actions tab:
+*Actions → Frag die KI → Run workflow*. Type a question about this repository,
+press start, and the answer is in the run summary. No terminal needed — which
+is the point, because this project is maintained from an iPad.
 
-The same workflow runs **on its own every Monday** and works through
-`.github/dauerauftrag.md` (German: *standing order*) — a plain Markdown file
-you edit like any other. It currently asks for four things: whether the
-README's numbers still match the source, whether every action is pinned to a
-commit, whether the counterproof still catches everything, and whether the
-bots find anything in their own repository.
+It runs on **GitHub Models** with the built-in `GITHUB_TOKEN` and the single
+permission `models: read`. No API key, no second account, no bill.
 
-**It needs `ANTHROPIC_API_KEY` as a repository secret.** Without it the run
-fails loudly on the first step rather than passing green having done nothing.
+> Pinned to `actions/ai-inference` **v2.1.1**, not v3. From v3 on, that action
+> no longer calls GitHub Models: it shells out to the Copilot CLI, which has to
+> be installed and authenticated on the runner with its own token. v2.1.1 is
+> the last version that talks to `https://models.github.ai/inference` with the
+> token the workflow already has.
 
-> Every run costs real money against that key, which is why the standing order
-> runs weekly and not on every push, and why `--max-turns` is set: a ceiling is
-> cheaper than a bill.
+`.github/workflows/ki-wochenbericht.yml` is the same idea **on a schedule**.
+Every Monday it measures — how many checks ran, how many mutations exist, what
+the bots find in this repository, and whether the numbers in this README still
+match — and has the model say what deserves attention. The measurement, not the
+model, decides whether an issue is opened.
+
+**The AI reads. It does not write.** It changes no code and opens no pull
+request; that would need an agent, and an agent costs money. This project has
+none.
 
 ## The counterproof
 

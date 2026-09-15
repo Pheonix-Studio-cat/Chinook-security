@@ -1,0 +1,139 @@
+# Der wiederkehrende Auftrag -- kostenlos, jede Woche von selbst.
+#
+# Er tritt an die Stelle des bezahlten Dauerauftrags. Der Unterschied ist
+# wichtig genug, um ihn hinzuschreiben: **die KI aendert hier nichts.** Sie
+# oeffnet keinen Pull Request und schreibt keinen Code. Was sie tut, ist
+# lesen und einordnen.
+#
+# Gemessen wird von Python, nicht von der KI. Die Zahlen unten stehen so im
+# Bericht, wie sie gemessen wurden; die KI bekommt sie vorgelegt und sagt,
+# was daran Aufmerksamkeit verdient. **Ob ein Issue aufgeht, entscheidet die
+# Messung, nicht die Antwort des Modells** -- sonst haenge eine Entscheidung
+# an einem Satz, den ein Modell auch anders haette formulieren koennen.
+#
+# Die Gegenprobe laeuft hier **nicht** noch einmal: das tut der `Wochenlauf`,
+# und er wird von selbst rot, wenn eine Mutation entkommt. Zweimal dasselbe
+# zu rechnen macht den Bericht nicht wahrer.
+name: KI-Wochenbericht
+
+on:
+  schedule:
+    # Nach dem Wochenlauf (43 6 * * 1), damit ein frisches Ergebnis vorliegt.
+    - cron: "20 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  models: read      # fuer GitHub Models
+  issues: write     # nur, wenn die Messung etwas findet
+
+jobs:
+  bericht:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # Kein Schritt hier traegt ein `if:`. Ein uebersprungener Schritt sieht
+      # genauso aus wie ein erfolgreicher -- daran ist der Merge-Bot im
+      # Gedaechtnis-Repo schon einmal gescheitert.
+      - name: Messen
+        id: messen
+        run: |
+          set -uo pipefail
+          python3 -m unittest discover -s checks -t . -q > pruefung.txt 2>&1
+          pruefstand=$?
+          pruefungen=$(grep "^Ran" pruefung.txt || echo "Ran ? tests")
+          if [ "$pruefstand" -eq 0 ]; then ergebnis="OK"; else ergebnis="FEHLGESCHLAGEN (Exit $pruefstand)"; fi
+          mutationen=$(python3 -c 'from checks.counterproof import MUTATIONEN; print(len(MUTATIONEN))')
+          regeln=$(python3 -c 'from webseite import build; print(sum(len(m.regeln()) for m, _, _ in build.BOTS), "Regeln in", len(build.BOTS), "Bots")')
+          for bot in secret-bot workflow-bot code-bot license-bot; do
+            python3 -m chinook.cli "$bot" --path . --fail-on never --json "befunde-$bot.json" > "ausgabe-$bot.txt" 2>&1 || true
+          done
+          befunde=$(python3 -c 'import json,glob; print(sum(len(json.load(open(f)).get("findings", [])) for f in sorted(glob.glob("befunde-*.json"))))')
+          {
+            echo "## Gemessen am $(date -u +%F)"
+            echo
+            echo "- Pruefungen: $pruefungen -- $ergebnis"
+            echo "- Mutationen in der Gegenprobe: $mutationen"
+            echo "- Regeln: $regeln"
+            echo "- Befunde der Bots im eigenen Repo: $befunde"
+            echo
+            echo "### Was die README behauptet"
+            echo
+            grep -n -E "checks, all green|mutations, all caught" README.md || echo "(keine Zahl gefunden)"
+            echo
+            echo "### Ausgabe der Bots"
+            echo
+            for a in ausgabe-*.txt; do
+              echo "#### $a"
+              head -c 2000 "$a"
+              echo
+            done
+          } > messung.md
+          # Die Frage, die die Messung selbst beantwortet -- nicht das Modell.
+          auffaellig="nein"
+          if [ "$befunde" -gt 0 ]; then auffaellig="ja"; fi
+          if [ "$pruefstand" -ne 0 ]; then auffaellig="ja"; fi
+          zahl=$(echo "$pruefungen" | awk '{print $2}')
+          if ! grep -q "$zahl checks, all green" README.md; then auffaellig="ja"; fi
+          if ! grep -q "$mutationen mutations, all caught" README.md; then auffaellig="ja"; fi
+          echo "auffaellig=$auffaellig" >> "$GITHUB_OUTPUT"
+          echo "Auffaellig: $auffaellig"
+          cat messung.md
+
+      - name: Die KI einordnen lassen
+        id: ki
+        uses: actions/ai-inference@a7805884c80886efc241e94a5351df715968a0ad # v2.1.1
+        with:
+          system-prompt: >-
+            Du liest den Wochenbericht des Repos "Chinook Security" -- eines
+            Werkzeugkastens aus Sicherheits-Bots. Dir werden **gemessene**
+            Zahlen vorgelegt. Sage in hoechstens zehn Zeilen auf Deutsch, was
+            daran Aufmerksamkeit verdient und was nicht. Weichen die Zahlen
+            der README von den gemessenen ab, ist das der wichtigste Punkt.
+            Rechne nichts nach, was nicht dasteht, und erfinde keine Zahlen,
+            keine Dateinamen und keine Commit-SHAs. Steht nichts Auffaelliges
+            drin, sag genau das in einem Satz.
+          prompt-file: messung.md
+          max-completion-tokens: "800"
+
+      - name: Bericht ablegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          AUFFAELLIG: ${{ steps.messen.outputs.auffaellig }}
+          ANTWORT: ${{ steps.ki.outputs.response }}
+        run: |
+          set -euo pipefail
+          {
+            echo "# KI-Wochenbericht"
+            echo
+            echo "## Was die KI dazu sagt"
+            echo
+            printf '%s\n' "$ANTWORT"
+            echo
+            echo "_Eingeordnet von einem Sprachmodell über GitHub Models. Die"
+            echo "Zahlen darunter sind gemessen, dieser Absatz ist es nicht._"
+            echo
+            cat messung.md
+            echo
+            echo "[Der Lauf]($LAUF)"
+          } > bericht.md
+          cat bericht.md >> "$GITHUB_STEP_SUMMARY"
+          if [ "$AUFFAELLIG" = "ja" ]; then
+            titel="KI-Wochenbericht: etwas ist auffällig ($(date -u +%F))"
+            # `export`, nicht nur zuweisen: die Python-Zeile unten liest den
+            # Titel aus der Umgebung. Von Hand zusammengebautes JSON zerbricht
+            # am ersten Anfuehrungszeichen im Bericht, deshalb baut ihn Python.
+            export TITEL="$titel"
+            curl --fail-with-body -sS -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/issues" \
+              -d "$(python3 -c 'import json,os,sys; print(json.dumps({"title": os.environ["TITEL"], "body": open("bericht.md").read()}))' )" \
+              > /dev/null
+            echo "Issue geöffnet."
+          else
+            echo "Nichts Auffälliges gemessen -- kein Issue. Der Bericht steht in der Zusammenfassung."
+          fi
