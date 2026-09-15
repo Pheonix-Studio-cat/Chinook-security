@@ -38,7 +38,7 @@ findings and keeps the bots honest, the **website** and the **weekly run**.
 | **Website** | ✅ generated from the source, GitHub Pages |
 | **Weekly run** | ✅ Mondays, without a commit |
 
-**220 checks, all green. 47 mutations, all caught.**
+**221 checks, all green. 47 mutations, all caught.**
 
 **No dependencies.** The Python standard library only. A security tool with
 three hundred transitive packages is an attack surface itself, and a lockfile
@@ -420,20 +420,47 @@ that answers differently than last week.
 press start, and the answer is in the run summary. No terminal needed — which
 is the point, because this project is maintained from an iPad.
 
-It runs on **GitHub Models** with the built-in `GITHUB_TOKEN` and the single
-permission `models: read`. No API key, no second account, no bill.
-
-> Pinned to `actions/ai-inference` **v2.1.1**, not v3. From v3 on, that action
-> no longer calls GitHub Models: it shells out to the Copilot CLI, which has to
-> be installed and authenticated on the runner with its own token. v2.1.1 is
-> the last version that talks to `https://models.github.ai/inference` with the
-> token the workflow already has.
-
 `.github/workflows/ki-wochenbericht.yml` is the same idea **on a schedule**.
 Every Monday it measures — how many checks ran, how many mutations exist, what
 the bots find in this repository, and whether the numbers in this README still
-match — and has the model say what deserves attention. The measurement, not the
-model, decides whether an issue is opened.
+match — and opens an issue when something is off. The measurement, not the
+model, decides whether that issue is opened.
+
+**The weekly report runs without AI too.** The numbers are computed by Python
+and stand on their own. With the token set, an interpretation in prose is added
+on top; without it, the report says **in so many words** that there is none. So
+the run never goes red because some service is down, and it never silently does
+nothing either.
+
+### What it needs once
+
+A repository secret `COPILOT_PAT`: a **fine-grained personal access token**
+with the **Copilot Requests** permission. Without it the button says so in
+plain text instead of passing green.
+
+### Why not GitHub Models
+
+Because the service is gone. The first version of these workflows called
+GitHub Models with the built-in `GITHUB_TOKEN` — no secret, no second account.
+The first real run answered:
+
+```
+410 GitHub Models is temporarily unavailable
+as part of a scheduled retirement brownout.
+```
+
+That is also why `actions/ai-inference` switched to the Copilot CLI in v3: not
+a version bump, a move. And the built-in `GITHUB_TOKEN` is **not** enough for
+that CLI — tried, not assumed:
+
+```
+Error: Authentication failed
+If using a Fine-Grained PAT, ensure it has the
+'Copilot Requests' permission enabled
+```
+
+`checks/test_ki_workflows.py` holds all of this in place, including a check
+that no workflow ever points at the dead endpoint again.
 
 **The AI reads. It does not write.** It changes no code and opens no pull
 request; that would need an agent, and an agent costs money. This project has

@@ -1,15 +1,17 @@
-# Der wiederkehrende Auftrag -- kostenlos, jede Woche von selbst.
+# Der wiederkehrende Auftrag: montags messen und berichten.
 #
-# Er tritt an die Stelle des bezahlten Dauerauftrags. Der Unterschied ist
-# wichtig genug, um ihn hinzuschreiben: **die KI aendert hier nichts.** Sie
-# oeffnet keinen Pull Request und schreibt keinen Code. Was sie tut, ist
-# lesen und einordnen.
+# **Er laeuft auch ohne KI.** Das ist Absicht und nicht Sparsamkeit: die
+# Zahlen rechnet Python, und die taugen fuer sich. Ist das Secret
+# `COPILOT_PAT` hinterlegt, kommt oben drauf eine Einordnung in Worten;
+# fehlt es, steht im Bericht **ausdruecklich**, dass keine da ist.
 #
-# Gemessen wird von Python, nicht von der KI. Die Zahlen unten stehen so im
-# Bericht, wie sie gemessen wurden; die KI bekommt sie vorgelegt und sagt,
-# was daran Aufmerksamkeit verdient. **Ob ein Issue aufgeht, entscheidet die
-# Messung, nicht die Antwort des Modells** -- sonst haenge eine Entscheidung
-# an einem Satz, den ein Modell auch anders haette formulieren koennen.
+# Damit geht der Lauf nie rot, nur weil ein KI-Dienst nicht antwortet -- und
+# er tut trotzdem nie stillschweigend nichts. Beides war schon einmal ein
+# Fehler in diesem Projekt.
+#
+# **Ob ein Issue aufgeht, entscheidet die Messung, nicht das Modell.** Sonst
+# haenge eine Entscheidung an einem Satz, den ein Modell naechste Woche
+# anders formuliert.
 #
 # Die Gegenprobe laeuft hier **nicht** noch einmal: das tut der `Wochenlauf`,
 # und er wird von selbst rot, wenn eine Mutation entkommt. Zweimal dasselbe
@@ -24,7 +26,6 @@ on:
 
 permissions:
   contents: read
-  models: read      # fuer GitHub Models
   issues: write     # nur, wenn die Messung etwas findet
 
 jobs:
@@ -33,9 +34,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      # Kein Schritt hier traegt ein `if:`. Ein uebersprungener Schritt sieht
-      # genauso aus wie ein erfolgreicher -- daran ist der Merge-Bot im
-      # Gedaechtnis-Repo schon einmal gescheitert.
+      # Der Kern der Arbeit. **Kein `if:`** -- ein uebersprungener Schritt
+      # sieht genauso aus wie ein erfolgreicher.
       - name: Messen
         id: messen
         run: |
@@ -81,9 +81,37 @@ jobs:
           echo "Auffaellig: $auffaellig"
           cat messung.md
 
+      - name: Ist das Token hinterlegt?
+        id: token
+        env:
+          TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN:-}" ]; then
+            echo "da=nein" >> "$GITHUB_OUTPUT"
+            echo "Kein COPILOT_PAT -- der Bericht kommt ohne Einordnung."
+          else
+            echo "da=ja" >> "$GITHUB_OUTPUT"
+            echo "COPILOT_PAT ist hinterlegt."
+          fi
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: Copilot-CLI installieren
+        run: npm install -g @github/copilot
+
+      # **Hier ist ein `if:` erlaubt**, und nur hier: dieser Schritt ist
+      # ausdruecklich die Zugabe, nicht die Arbeit. Dass er uebersprungen
+      # wurde, steht unten im Bericht im Klartext -- still verschwinden kann
+      # er also nicht. `continue-on-error`, weil ein fremder Dienst den
+      # Wochenbericht nicht kippen soll.
       - name: Die KI einordnen lassen
         id: ki
-        uses: actions/ai-inference@a7805884c80886efc241e94a5351df715968a0ad # v2.1.1
+        if: steps.token.outputs.da == 'ja'
+        continue-on-error: true
+        uses: actions/ai-inference@2c43c91ae16266ca159d311430343c67a5ffa222 # v3
         with:
           system-prompt: >-
             Du liest den Wochenbericht des Repos "Chinook Security" -- eines
@@ -95,7 +123,8 @@ jobs:
             keine Dateinamen und keine Commit-SHAs. Steht nichts Auffaelliges
             drin, sag genau das in einem Satz.
           prompt-file: messung.md
-          max-completion-tokens: "800"
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
 
       - name: Bericht ablegen
         env:
@@ -103,6 +132,7 @@ jobs:
           REPO: ${{ github.repository }}
           LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           AUFFAELLIG: ${{ steps.messen.outputs.auffaellig }}
+          TOKEN_DA: ${{ steps.token.outputs.da }}
           ANTWORT: ${{ steps.ki.outputs.response }}
         run: |
           set -euo pipefail
@@ -111,10 +141,21 @@ jobs:
             echo
             echo "## Was die KI dazu sagt"
             echo
-            printf '%s\n' "$ANTWORT"
-            echo
-            echo "_Eingeordnet von einem Sprachmodell über GitHub Models. Die"
-            echo "Zahlen darunter sind gemessen, dieser Absatz ist es nicht._"
+            if [ -n "${ANTWORT:-}" ]; then
+              printf '%s\n' "$ANTWORT"
+              echo
+              echo "_Eingeordnet von einem Sprachmodell. Die Zahlen darunter sind"
+              echo "gemessen, dieser Absatz ist es nicht._"
+            elif [ "$TOKEN_DA" = "nein" ]; then
+              echo "**Keine Einordnung: das Secret \`COPILOT_PAT\` ist nicht hinterlegt.**"
+              echo "Gebraucht wird ein Fine-Grained Personal Access Token mit dem Recht"
+              echo "\`Copilot Requests\`. Die Zahlen unten sind davon unberührt — sie sind"
+              echo "gemessen, nicht erfragt."
+            else
+              echo "**Keine Einordnung: der KI-Dienst hat nicht geantwortet.**"
+              echo "Der Grund steht im Protokoll des Laufs. Die Zahlen unten sind davon"
+              echo "unberührt — sie sind gemessen, nicht erfragt."
+            fi
             echo
             cat messung.md
             echo
@@ -122,7 +163,7 @@ jobs:
           } > bericht.md
           cat bericht.md >> "$GITHUB_STEP_SUMMARY"
           if [ "$AUFFAELLIG" = "ja" ]; then
-            titel="KI-Wochenbericht: etwas ist auffällig ($(date -u +%F))"
+            titel="Wochenbericht: etwas ist auffällig ($(date -u +%F))"
             # `export`, nicht nur zuweisen: die Python-Zeile unten liest den
             # Titel aus der Umgebung. Von Hand zusammengebautes JSON zerbricht
             # am ersten Anfuehrungszeichen im Bericht, deshalb baut ihn Python.
@@ -131,7 +172,7 @@ jobs:
               -H "Authorization: Bearer $GH_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               "https://api.github.com/repos/$REPO/issues" \
-              -d "$(python3 -c 'import json,os,sys; print(json.dumps({"title": os.environ["TITEL"], "body": open("bericht.md").read()}))' )" \
+              -d "$(python3 -c 'import json,os; print(json.dumps({"title": os.environ["TITEL"], "body": open("bericht.md").read()}))' )" \
               > /dev/null
             echo "Issue geöffnet."
           else
