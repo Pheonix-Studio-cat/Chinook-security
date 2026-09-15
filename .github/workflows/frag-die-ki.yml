@@ -34,7 +34,10 @@ jobs:
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -uo pipefail
+          # `set +e` ist der Punkt. GitHub startet jeden `run`-Block mit
+          # `bash -e`; ohne das Aufheben bricht der Block beim ersten
+          # Fehlschlag ab -- und meine echo-Zeilen darunter laufen nie.
+          set +e
           copilot -p "Sag Hallo." -s --no-ask-user --model gpt-4.1 > raus.txt 2> fehler.txt
           stand=$?
           echo "Exit: $stand"
