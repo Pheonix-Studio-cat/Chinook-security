@@ -494,3 +494,54 @@ Und zwei bestehende Mutationen waren **mehrdeutig**: ihr Suchtext kam mehrfach
 in `cli.py` vor, `replace(..., 1)` traf die erste Stelle statt der gemeinten.
 Eine davon war es von Anfang an. Die Gegenprobe weist Mehrdeutigkeit jetzt
 zurueck, statt sie stillschweigend hinzunehmen.
+
+---
+
+## Claude auf Zuruf, und ein Dauerauftrag
+
+Seit dem 2026-09-15 liegt `.github/workflows/claude.yml` im Repo: ein
+**Textfeld** im Actions-Reiter, in das der Projektinhaber schreibt, was zu tun
+ist. Das Ergebnis kommt als Pull Request. Dazu ein Dauerauftrag in
+`.github/dauerauftrag.md`, den Claude montags von selbst abarbeitet.
+
+**Warum ein Textfeld und keine `@claude`-Erwaehnung.** Die Action kann auch auf
+Kommentare reagieren. Das setzt aber voraus, dass es schon ein Issue oder einen
+Pull Request gibt, in den man hineinschreibt. Der Projektinhaber arbeitet
+ausschliesslich am iPad und will **anfangen** koennen, nicht nur antworten --
+ein Feld unter *Run workflow* ist dafuer der kuerzere Weg.
+
+**Der Dauerauftrag ist eine Markdown-Datei, kein Code.** Er laesst sich am iPad
+bearbeiten wie jede andere Datei, und beim naechsten Montag gilt der neue Text.
+Haette er im Workflow gestanden, waere jede Aenderung daran eine Aenderung an
+`.github/` -- und damit in anderen Repos eine, die der Merge-Bot nicht anfassen
+darf.
+
+**Was der Dauerauftrag verlangt**, ist aus den eigenen Fehlern gewachsen: ob
+die README-Zahlen noch zum Quelltext passen (sie standen einmal auf 146 statt
+162), ob jede Action auf einem Commit festliegt, ob die Gegenprobe noch alles
+faengt, und ob die Bots im eigenen Repo etwas finden.
+
+### Ohne Schluessel faellt der Lauf um, statt gruen durchzulaufen
+
+Der erste Schritt prueft, ob `ANTHROPIC_API_KEY` hinterlegt ist, und bricht mit
+einer Klartextmeldung ab, wenn nicht. Das ist dieselbe Regel wie ueberall hier:
+ein Lauf, der stillschweigend nichts tut, sieht aus wie einer, der etwas getan
+hat.
+
+### Beim Festlegen der Action fast ein echter Fehler
+
+`anthropics/claude-code-action` benutzt **annotierte** Tags. Bei denen zeigt
+`refs/tags/v1.0.225` auf ein **Tag-Objekt**, nicht auf den Commit -- erst
+`refs/tags/v1.0.225^{}` liefert den Commit, und `uses:` braucht den Commit.
+
+Die erste Fassung stand auf dem Tag-Objekt. Aufgefallen ist es nur, weil ich
+die Ausgabe von `git ls-remote --tags` ein zweites Mal ohne Filter angesehen
+habe.
+
+**Die bestehenden Pins sind davon nicht betroffen:** `actions/checkout`,
+`actions/setup-node` und `actions/setup-python` benutzen **leichte** Tags, bei
+denen es keine `^{}`-Zeile gibt und der Tag der Commit ist. Nachgesehen, nicht
+angenommen.
+
+**Die Regel:** *beim Holen eines Commits zu einem Tag immer nach der
+`^{}`-Zeile sehen; gibt es sie, ist sie die richtige.*

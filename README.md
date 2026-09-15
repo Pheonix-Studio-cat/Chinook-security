@@ -413,6 +413,27 @@ without anyone having to commit anything. It catches what changes **without a
 commit** — a new advisory at OSV, a changed default in GitHub Actions, a tool
 that answers differently than last week.
 
+## Claude on demand
+
+`.github/workflows/claude.yml` puts a **text field** in the Actions tab:
+*Actions → Claude → Run workflow*. Type what Claude should do in this
+repository, press start, and the result arrives as a pull request. No terminal
+needed — which is the point, because this project is maintained from an iPad.
+
+The same workflow runs **on its own every Monday** and works through
+`.github/dauerauftrag.md` (German: *standing order*) — a plain Markdown file
+you edit like any other. It currently asks for four things: whether the
+README's numbers still match the source, whether every action is pinned to a
+commit, whether the counterproof still catches everything, and whether the
+bots find anything in their own repository.
+
+**It needs `ANTHROPIC_API_KEY` as a repository secret.** Without it the run
+fails loudly on the first step rather than passing green having done nothing.
+
+> Every run costs real money against that key, which is why the standing order
+> runs weekly and not on every push, and why `--max-turns` is set: a ceiling is
+> cheaper than a bill.
+
 ## The counterproof
 
 ```
