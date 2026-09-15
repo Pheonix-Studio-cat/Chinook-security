@@ -1,0 +1,157 @@
+# Frag die KI -- ein Eingabefeld, kostenlos.
+#
+# **So benutzt du es:** Actions -> "Frag die KI" -> *Run workflow*. Dort steht
+# ein Textfeld. Du tippst eine Frage zu diesem Repo hinein, druckst Start, und
+# die Antwort steht danach in der Zusammenfassung des Laufs -- lesbar am iPad,
+# ohne Terminal.
+#
+# ## Warum das nichts kostet
+#
+# Es benutzt **GitHub Models**, die eingebaute KI-Schnittstelle von GitHub.
+# Kein API-Schluessel, kein zweites Konto, keine Rechnung. Der eingebaute
+# `GITHUB_TOKEN` genuegt, wenn der Workflow `models: read` verlangt.
+#
+# **Deshalb steht hier v2.1.1 und nicht v3.** Ab v3 ruft
+# `actions/ai-inference` nicht mehr GitHub Models auf, sondern die
+# **Copilot-CLI** -- die auf dem Runner erst installiert und mit einem
+# eigenen Token (`COPILOT_GITHUB_TOKEN`) angemeldet werden muss. Das ist ein
+# zweites Konto und moeglicherweise ein Abo; genau das, was hier nicht sein
+# soll. v2.1.1 ist die letzte Fassung, die mit dem eingebauten Token an
+# `https://models.github.ai/inference` geht.
+#
+# **Ob dein Konto fuer GitHub Models freigeschaltet ist, weiss dieser
+# Kommentar nicht.** Faellt der Lauf mit einer Berechtigungsmeldung um, ist
+# das die Antwort -- nicht ein Fehler dieser Datei.
+#
+# ## Was es **nicht** kann
+#
+# Es beantwortet Fragen. Es **aendert keinen Code** und oeffnet keinen Pull
+# Request -- dafuer braeuchte es einen Agenten, und der kostet Geld. Wer Code
+# geaendert haben will, fragt Claude in einer Sitzung.
+name: Frag die KI
+
+on:
+  workflow_dispatch:
+    inputs:
+      frage:
+        description: "Was willst du über dieses Repo wissen?"
+        required: true
+        type: string
+      umfang:
+        description: "Wie viel vom Repo soll die KI mitlesen?"
+        required: false
+        default: "README und docs"
+        type: choice
+        options:
+          - "README und docs"
+          - "nur die Dateiliste"
+          - "README, docs und die Regeltabellen der Bots"
+
+permissions:
+  contents: read
+  models: read     # das eine Recht, das die KI-Schnittstelle braucht
+
+jobs:
+  fragen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # Ohne Zusammenhang antwortet die KI ins Blaue. Hier wird
+      # zusammengetragen, was sie lesen soll -- **begrenzt**, weil die
+      # kostenlose Stufe von GitHub Models eine Obergrenze fuer die Eingabe
+      # hat. Ein zu langer Text wird abgewiesen oder abgeschnitten, und dann
+      # fehlt die Haelfte, ohne dass es jemandem auffaellt.
+      - name: Frage und Zusammenhang zusammenstellen
+        env:
+          UMFANG: ${{ inputs.umfang }}
+          FRAGE: ${{ inputs.frage }}
+        run: |
+          set -euo pipefail
+          {
+            echo "# Die Frage"
+            echo
+            printf '%s\n' "$FRAGE"
+            echo
+            echo "# Zum Nachlesen: das Repo Chinook Security"
+            echo
+            echo "## Dateien"
+            git ls-files | head -120
+            echo
+            if [ "$UMFANG" != "nur die Dateiliste" ]; then
+              echo "## README.md"
+              head -c 9000 README.md
+              echo
+              for d in docs/*.md; do
+                [ -f "$d" ] || continue
+                echo "## $d"
+                head -c 2500 "$d"
+                echo
+              done
+            fi
+            if [ "$UMFANG" = "README, docs und die Regeltabellen der Bots" ]; then
+              echo "## Die Regeln, die die Bots anwenden"
+              # Einzeiler mit Semikolons, kein mehrzeiliges Skript: eine Zeile
+              # auf Spalte 0 wuerde den YAML-Block beenden, und GitHub koennte
+              # die Datei nicht mehr laden. Genau daran ist schon einmal eine
+              # action.yml gescheitert -- und beim Schreiben dieser Datei ist
+              # es mir prompt wieder passiert. Gefangen hat es
+              # `checks/test_yaml_bloecke.py`.
+              python3 -c 'import json; from webseite import build; [print(f"### {n}", json.dumps(m.regeln(), ensure_ascii=False, indent=1), sep=chr(10)) for m, n, _ in build.BOTS]'
+            fi
+          } > roh.txt
+          # Die harte Obergrenze. Lieber abgeschnitten **und gesagt**, als
+          # eine Absage der Schnittstelle, die wie ein Fehler dieser Datei
+          # aussieht. Die Frage steht oben, also ueberlebt sie den Schnitt.
+          head -c 24000 roh.txt > frage.txt
+          # `.txt`, nicht `.md`: die Action liest `.txt` und `.prompt.yml`.
+          #
+          # Und die Frage steht **in** der Datei, nicht im Feld `input:` --
+          # das templatet nur `.prompt.yml`. Mit einer anderen Endung waere
+          # die Frage still verschwunden, und das Modell haette geantwortet,
+          # nur eben nicht auf sie. Ein Ergebnis, das aussieht wie eines.
+          roh=$(wc -c < roh.txt)
+          jetzt=$(wc -c < frage.txt)
+          echo "Zusammenhang: $roh Zeichen, davon $jetzt geschickt."
+          if [ "$roh" -gt "$jetzt" ]; then
+            echo "::warning::Der Zusammenhang wurde auf $jetzt Zeichen gekuerzt. Die Antwort kennt den Rest nicht."
+          fi
+          head -5 frage.txt
+
+      - name: Frage stellen
+        id: ki
+        uses: actions/ai-inference@a7805884c80886efc241e94a5351df715968a0ad # v2.1.1
+        with:
+          system-prompt: >-
+            Du beantwortest Fragen über das Repo "Chinook Security" -- ein
+            Werkzeugkasten aus Sicherheits-Bots, die als GitHub Actions laufen.
+            Antworte auf Deutsch, knapp und konkret. Stütze dich
+            ausschliesslich auf den mitgelieferten Zusammenhang. Weisst du
+            etwas nicht, sag das -- erfinde keine Zahlen, keine Dateinamen und
+            keine Commit-SHAs. "Ich weiss es nicht" ist eine vollständige
+            Antwort.
+          prompt-file: frage.txt
+          # Ohne das antwortet die Action mit **200 Tokens** -- das ist der
+          # eingebaute Standard, und er schneidet mitten im Satz ab.
+          max-completion-tokens: "1200"
+
+      # Die Antwort gehoert dorthin, wo er sie am iPad sieht: in die
+      # Zusammenfassung des Laufs, nicht nur ins Protokoll.
+      - name: Antwort anzeigen
+        env:
+          FRAGE: ${{ inputs.frage }}
+          ANTWORT: ${{ steps.ki.outputs.response }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Frage"
+            echo
+            printf '%s\n' "$FRAGE"
+            echo
+            echo "## Antwort"
+            echo
+            printf '%s\n' "$ANTWORT"
+            echo
+            echo "---"
+            echo "_Über GitHub Models beantwortet. Die KI hat nur gelesen, nichts geändert._"
+          } >> "$GITHUB_STEP_SUMMARY"
