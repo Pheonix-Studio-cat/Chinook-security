@@ -1,23 +1,34 @@
 """Prueft die beiden Workflows, die ein Sprachmodell aufrufen.
 
-Es gibt sie wegen eines Fehlers, der **plausibel ausgesehen und nie
-funktioniert haette**.
+Es gibt sie wegen zweier Fehler an derselben Stelle, beide erst von einem
+**echten Lauf** aufgedeckt.
 
-Die erste Fassung stand auf `actions/ai-inference@v3` -- der neuesten Fassung,
-also scheinbar der richtigen. Ab v3 ruft diese Action aber gar nicht mehr
-GitHub Models auf: sie startet die Copilot-CLI, die auf dem Runner erst
-installiert und mit einem **eigenen** Token angemeldet sein muss. Das Recht
-`models: read` haette dort nichts mehr bewirkt. Der Workflow haette richtig
-ausgesehen, und der erste Lauf waere umgefallen -- mit einer Meldung ueber die
-Copilot-CLI, die niemanden auf die Versionsnummer gebracht haette.
+**Erstens** stand die erste Fassung auf v2.1.1, weil die mit dem eingebauten
+`GITHUB_TOKEN` an GitHub Models geht -- kein Secret, kein zweites Konto. Der
+erste echte Lauf antwortete:
 
-Deshalb zwei Festlegungen, die hier festgehalten werden:
+    410 GitHub Models is temporarily unavailable as part of a
+    scheduled retirement brownout.
 
-1. Wer `actions/ai-inference` benutzt, **muss** `models: read` deklarieren.
-   Ohne das Recht kommt die Anfrage nicht durch.
-2. Der Commit, auf den festgelegt ist, steht **hier** und ist damit nicht
-   still zu aendern. Ein Sprung auf v3 ist kein Versionssprung, sondern ein
-   Anbieterwechsel; er gehoert bewusst gemacht, mit dieser Datei vor Augen.
+**Den Dienst gibt es nicht mehr.** Genau deshalb ist die Action ab v3 auf die
+Copilot-CLI umgestiegen: das war kein Versionssprung, das war der Umzug. Ich
+hatte die Schnittstelle sorgfaeltig gelesen und den Dienst nicht.
+
+**Zweitens** genuegt der Copilot-CLI der eingebaute `GITHUB_TOKEN` nicht.
+Ausprobiert, nicht vermutet; die CLI antwortete:
+
+    Error: Authentication failed
+    If using a Fine-Grained PAT, ensure it has the
+    'Copilot Requests' permission enabled
+
+Deshalb drei Festlegungen, die hier festgehalten werden:
+
+1. Wer `actions/ai-inference` benutzt, muss ihr ein Token ueber
+   `COPILOT_GITHUB_TOKEN` mitgeben. Der eingebaute Token genuegt nicht.
+2. Die Copilot-CLI muss vorher installiert werden -- sie ist auf den Runnern
+   nicht vorhanden.
+3. Der Commit, auf den festgelegt ist, steht **hier** und ist damit nicht
+   still zu aendern.
 
 Keine Abhaengigkeit, kein YAML-Parser: zeilenweise, wie der Workflow-Bot es
 haelt.
@@ -32,10 +43,11 @@ import unittest
 WURZEL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORKFLOWS = os.path.join(WURZEL, ".github", "workflows")
 
-# Die letzte Fassung von `actions/ai-inference`, die mit dem eingebauten
-# `GITHUB_TOKEN` an `https://models.github.ai/inference` geht. Nachgelesen in
-# der `action.yml` an genau diesem Commit, nicht aus der Erinnerung.
-ERLAUBTER_COMMIT = "a7805884c80886efc241e94a5351df715968a0ad"  # v2.1.1
+# Die Fassung, die die Copilot-CLI aufruft. Nachgelesen in der `action.yml`
+# an genau diesem Commit, nicht aus der Erinnerung -- und der Lauf dazu ist
+# bis zur Authentifizierungsmeldung der CLI gekommen, hat die Action also
+# tatsaechlich benutzt.
+ERLAUBTER_COMMIT = "2c43c91ae16266ca159d311430343c67a5ffa222"  # v3
 
 BENUTZT = re.compile(r"^\s*uses:\s*actions/ai-inference@(\S+)", re.MULTILINE)
 
@@ -71,31 +83,40 @@ class KiWorkflows(unittest.TestCase):
                     fassung,
                     ERLAUBTER_COMMIT,
                     f"{name}: actions/ai-inference steht auf {fassung}. "
-                    f"Ab v3 ruft die Action die Copilot-CLI statt GitHub Models "
-                    f"auf und braucht ein eigenes Token; `models: read` wirkt "
-                    f"dann nicht mehr. Wer die Fassung wechselt, aendert hier "
-                    f"bewusst mit.",
+                    f"Vor v3 ruft die Action GitHub Models auf -- den Dienst "
+                    f"gibt es nicht mehr, er antwortet mit HTTP 410. Wer die "
+                    f"Fassung wechselt, aendert hier bewusst mit.",
                 )
 
-    def test_models_read_ist_deklariert(self):
-        for name, text, _treffer in _mit_ki():
-            self.assertRegex(
-                text,
-                r"(?m)^\s*models:\s*read\s*(#.*)?$",
-                f"{name} ruft actions/ai-inference auf, deklariert aber kein "
-                f"`models: read`. In GitHub Actions wird kein Recht geerbt: "
-                f"was nicht dasteht, ist `none`.",
-            )
-
-    def test_antwortlaenge_ist_gesetzt(self):
-        """Der eingebaute Standard sind 200 Tokens -- das schneidet ab."""
+    def test_token_wird_mitgegeben(self):
         for name, text, _treffer in _mit_ki():
             self.assertIn(
-                "max-completion-tokens",
+                "COPILOT_GITHUB_TOKEN",
                 text,
-                f"{name} setzt keine Antwortlaenge. Ohne sie antwortet die "
-                f"Action mit 200 Tokens und schneidet mitten im Satz ab -- "
-                f"eine Antwort, die aussieht wie eine.",
+                f"{name} ruft actions/ai-inference auf, gibt ihr aber kein "
+                f"Token ueber COPILOT_GITHUB_TOKEN mit. Der eingebaute "
+                f"GITHUB_TOKEN genuegt der Copilot-CLI nicht -- sie antwortet "
+                f"mit 'Authentication failed'.",
+            )
+
+    def test_cli_wird_installiert(self):
+        """Die Copilot-CLI ist auf den Runnern nicht vorinstalliert."""
+        for name, text, _treffer in _mit_ki():
+            self.assertIn(
+                "npm install -g @github/copilot",
+                text,
+                f"{name} ruft actions/ai-inference auf, installiert die "
+                f"Copilot-CLI aber nicht. Ohne sie faellt der Lauf um.",
+            )
+
+    def test_der_tote_dienst_kommt_nicht_zurueck(self):
+        """GitHub Models antwortet mit HTTP 410. Kein Workflow darf darauf zeigen."""
+        for name, text in _workflows():
+            self.assertNotIn(
+                "models.github.ai",
+                text,
+                f"{name} zeigt auf GitHub Models. Den Dienst gibt es nicht "
+                f"mehr; er antwortet mit HTTP 410.",
             )
 
 

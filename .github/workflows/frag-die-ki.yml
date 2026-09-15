@@ -1,33 +1,43 @@
-# Frag die KI -- ein Eingabefeld, kostenlos.
+# Frag die KI -- ein Eingabefeld im Actions-Reiter.
 #
-# **So benutzt du es:** Actions -> "Frag die KI" -> *Run workflow*. Dort steht
-# ein Textfeld. Du tippst eine Frage zu diesem Repo hinein, druckst Start, und
-# die Antwort steht danach in der Zusammenfassung des Laufs -- lesbar am iPad,
-# ohne Terminal.
+# **So benutzt du es:** Actions -> "Frag die KI" -> *Run workflow*. Frage
+# eintippen, Start druecken, Antwort steht in der Zusammenfassung des Laufs.
+# Lesbar am iPad, ohne Terminal.
 #
-# ## Warum das nichts kostet
+# ## Was einmal eingerichtet werden muss
 #
-# Es benutzt **GitHub Models**, die eingebaute KI-Schnittstelle von GitHub.
-# Kein API-Schluessel, kein zweites Konto, keine Rechnung. Der eingebaute
-# `GITHUB_TOKEN` genuegt, wenn der Workflow `models: read` verlangt.
+# Ein Repository-Secret namens `COPILOT_PAT`: ein **Fine-Grained Personal
+# Access Token** mit dem Recht **"Copilot Requests"**. Anzulegen unter
+# Settings -> Developer settings -> Personal access tokens, zu hinterlegen
+# unter Settings -> Secrets and variables -> Actions.
 #
-# **Deshalb steht hier v2.1.1 und nicht v3.** Ab v3 ruft
-# `actions/ai-inference` nicht mehr GitHub Models auf, sondern die
-# **Copilot-CLI** -- die auf dem Runner erst installiert und mit einem
-# eigenen Token (`COPILOT_GITHUB_TOKEN`) angemeldet werden muss. Das ist ein
-# zweites Konto und moeglicherweise ein Abo; genau das, was hier nicht sein
-# soll. v2.1.1 ist die letzte Fassung, die mit dem eingebauten Token an
-# `https://models.github.ai/inference` geht.
+# Fehlt es, sagt der erste Schritt das im Klartext, statt gruen
+# durchzulaufen.
 #
-# **Ob dein Konto fuer GitHub Models freigeschaltet ist, weiss dieser
-# Kommentar nicht.** Faellt der Lauf mit einer Berechtigungsmeldung um, ist
-# das die Antwort -- nicht ein Fehler dieser Datei.
+# ## Warum nicht GitHub Models
+#
+# **Weil es den Dienst nicht mehr gibt.** Die erste Fassung dieser Datei rief
+# GitHub Models mit dem eingebauten `GITHUB_TOKEN` auf -- kein Secret, kein
+# zweites Konto. Der erste echte Lauf antwortete:
+#
+#     410 GitHub Models is temporarily unavailable as part of a
+#     scheduled retirement brownout.
+#
+# Der Dienst wird abgeschaltet. Genau deshalb ist `actions/ai-inference` ab
+# v3 auf die Copilot-CLI umgestiegen -- das war kein Versionssprung, das war
+# der Umzug.
+#
+# Und der eingebaute `GITHUB_TOKEN` genuegt der Copilot-CLI **nicht**.
+# Ausprobiert, nicht vermutet; die CLI antwortete:
+#
+#     Error: Authentication failed
+#     If using a Fine-Grained PAT, ensure it has the
+#     'Copilot Requests' permission enabled
 #
 # ## Was es **nicht** kann
 #
 # Es beantwortet Fragen. Es **aendert keinen Code** und oeffnet keinen Pull
-# Request -- dafuer braeuchte es einen Agenten, und der kostet Geld. Wer Code
-# geaendert haben will, fragt Claude in einer Sitzung.
+# Request. Wer Code geaendert haben will, fragt Claude in einer Sitzung.
 name: Frag die KI
 
 on:
@@ -49,7 +59,6 @@ on:
 
 permissions:
   contents: read
-  models: read     # das eine Recht, das die KI-Schnittstelle braucht
 
 jobs:
   fragen:
@@ -57,11 +66,31 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      # Ohne Zusammenhang antwortet die KI ins Blaue. Hier wird
-      # zusammengetragen, was sie lesen soll -- **begrenzt**, weil die
-      # kostenlose Stufe von GitHub Models eine Obergrenze fuer die Eingabe
-      # hat. Ein zu langer Text wird abgewiesen oder abgeschnitten, und dann
-      # fehlt die Haelfte, ohne dass es jemandem auffaellt.
+      # Ohne Token kann der Lauf nichts tun. Er sagt es **laut**, statt gruen
+      # durchzulaufen -- ein Lauf, der stillschweigend nichts tut, sieht aus
+      # wie einer, der etwas getan hat.
+      - name: Ist das Token hinterlegt?
+        env:
+          TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN:-}" ]; then
+            echo "::error::Das Secret COPILOT_PAT fehlt. Gebraucht wird ein Fine-Grained Personal Access Token mit dem Recht 'Copilot Requests', hinterlegt unter Settings -> Secrets and variables -> Actions. Ohne das Token weist die Copilot-CLI die Anfrage mit 'Authentication failed' zurueck."
+            exit 1
+          fi
+          echo "Token ist hinterlegt."
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      # Die CLI ist auf den Runnern nicht vorinstalliert.
+      - name: Copilot-CLI installieren
+        run: npm install -g @github/copilot
+
+      # Ohne Zusammenhang antwortet die KI ins Blaue. Begrenzt, weil ein zu
+      # langer Text abgewiesen oder abgeschnitten wird -- und dann fehlt die
+      # Haelfte, ohne dass es jemandem auffaellt.
       - name: Frage und Zusammenhang zusammenstellen
         env:
           UMFANG: ${{ inputs.umfang }}
@@ -93,34 +122,23 @@ jobs:
               echo "## Die Regeln, die die Bots anwenden"
               # Einzeiler mit Semikolons, kein mehrzeiliges Skript: eine Zeile
               # auf Spalte 0 wuerde den YAML-Block beenden, und GitHub koennte
-              # die Datei nicht mehr laden. Genau daran ist schon einmal eine
-              # action.yml gescheitert -- und beim Schreiben dieser Datei ist
-              # es mir prompt wieder passiert. Gefangen hat es
+              # die Datei nicht mehr laden. Daran ist schon einmal eine
+              # action.yml gescheitert. Gefangen hat es
               # `checks/test_yaml_bloecke.py`.
               python3 -c 'import json; from webseite import build; [print(f"### {n}", json.dumps(m.regeln(), ensure_ascii=False, indent=1), sep=chr(10)) for m, n, _ in build.BOTS]'
             fi
           } > roh.txt
-          # Die harte Obergrenze. Lieber abgeschnitten **und gesagt**, als
-          # eine Absage der Schnittstelle, die wie ein Fehler dieser Datei
-          # aussieht. Die Frage steht oben, also ueberlebt sie den Schnitt.
           head -c 24000 roh.txt > frage.txt
-          # `.txt`, nicht `.md`: die Action liest `.txt` und `.prompt.yml`.
-          #
-          # Und die Frage steht **in** der Datei, nicht im Feld `input:` --
-          # das templatet nur `.prompt.yml`. Mit einer anderen Endung waere
-          # die Frage still verschwunden, und das Modell haette geantwortet,
-          # nur eben nicht auf sie. Ein Ergebnis, das aussieht wie eines.
           roh=$(wc -c < roh.txt)
           jetzt=$(wc -c < frage.txt)
           echo "Zusammenhang: $roh Zeichen, davon $jetzt geschickt."
           if [ "$roh" -gt "$jetzt" ]; then
             echo "::warning::Der Zusammenhang wurde auf $jetzt Zeichen gekuerzt. Die Antwort kennt den Rest nicht."
           fi
-          head -5 frage.txt
 
       - name: Frage stellen
         id: ki
-        uses: actions/ai-inference@a7805884c80886efc241e94a5351df715968a0ad # v2.1.1
+        uses: actions/ai-inference@2c43c91ae16266ca159d311430343c67a5ffa222 # v3
         with:
           system-prompt: >-
             Du beantwortest Fragen über das Repo "Chinook Security" -- ein
@@ -131,9 +149,8 @@ jobs:
             keine Commit-SHAs. "Ich weiss es nicht" ist eine vollständige
             Antwort.
           prompt-file: frage.txt
-          # Ohne das antwortet die Action mit **200 Tokens** -- das ist der
-          # eingebaute Standard, und er schneidet mitten im Satz ab.
-          max-completion-tokens: "1200"
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
 
       # Die Antwort gehoert dorthin, wo er sie am iPad sieht: in die
       # Zusammenfassung des Laufs, nicht nur ins Protokoll.
@@ -153,5 +170,5 @@ jobs:
             printf '%s\n' "$ANTWORT"
             echo
             echo "---"
-            echo "_Über GitHub Models beantwortet. Die KI hat nur gelesen, nichts geändert._"
+            echo "_Über die Copilot-CLI beantwortet. Die KI hat nur gelesen, nichts geändert._"
           } >> "$GITHUB_STEP_SUMMARY"
