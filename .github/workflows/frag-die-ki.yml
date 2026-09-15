@@ -28,6 +28,22 @@ jobs:
       - name: Copilot-CLI installieren
         run: npm install -g @github/copilot
 
+      # Die Action schluckt die stderr der CLI. Also einmal von Hand, damit
+      # die echte Meldung sichtbar wird.
+      - name: Was sagt die CLI wirklich?
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          copilot -p "Sag Hallo." -s --no-ask-user --model gpt-4.1 > raus.txt 2> fehler.txt
+          stand=$?
+          echo "Exit: $stand"
+          echo "--- stdout ---"
+          cat raus.txt
+          echo "--- stderr ---"
+          cat fehler.txt
+          exit 0
+
       - name: Frage stellen
         id: ki
         uses: actions/ai-inference@2c43c91ae16266ca159d311430343c67a5ffa222 # v3
