@@ -107,24 +107,43 @@ jobs:
       # wurde, steht unten im Bericht im Klartext -- still verschwinden kann
       # er also nicht. `continue-on-error`, weil ein fremder Dienst den
       # Wochenbericht nicht kippen soll.
+      # Die CLI direkt, wie beim Knopf: `actions/ai-inference` verschluckt
+      # die Fehlerausgabe und meldet nur "exited with code 1". Hier waere das
+      # besonders teuer -- der Schritt darf fehlschlagen, ohne den Lauf zu
+      # kippen, und dann stuende im Bericht "keine Einordnung", ohne dass
+      # irgendwo der Grund steht. Ein Fehlschlag ohne Grund ist einer, den
+      # niemand behebt.
+      #
+      # **Hier ist ein `if:` erlaubt**, und nur hier: dieser Schritt ist
+      # ausdruecklich die Zugabe, nicht die Arbeit. Dass er uebersprungen
+      # wurde, steht unten im Bericht im Klartext.
       - name: Die KI einordnen lassen
         id: ki
         if: steps.token.outputs.da == 'ja'
         continue-on-error: true
-        uses: actions/ai-inference@2c43c91ae16266ca159d311430343c67a5ffa222 # v3
-        with:
-          system-prompt: >-
-            Du liest den Wochenbericht des Repos "Chinook Security" -- eines
-            Werkzeugkastens aus Sicherheits-Bots. Dir werden **gemessene**
-            Zahlen vorgelegt. Sage in hoechstens zehn Zeilen auf Deutsch, was
-            daran Aufmerksamkeit verdient und was nicht. Weichen die Zahlen
-            der README von den gemessenen ab, ist das der wichtigste Punkt.
-            Rechne nichts nach, was nicht dasteht, und erfinde keine Zahlen,
-            keine Dateinamen und keine Commit-SHAs. Steht nichts Auffaelliges
-            drin, sag genau das in einem Satz.
-          prompt-file: messung.md
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          set +e
+          anweisung='Du liest den Wochenbericht des Repos "Chinook Security" -- eines Werkzeugkastens aus Sicherheits-Bots. Dir werden gemessene Zahlen vorgelegt. Sage in hoechstens zehn Zeilen auf Deutsch, was daran Aufmerksamkeit verdient und was nicht. Weichen die Zahlen der README von den gemessenen ab, ist das der wichtigste Punkt. Rechne nichts nach, was nicht dasteht, und erfinde keine Zahlen, keine Dateinamen und keine Commit-SHAs. Steht nichts Auffaelliges drin, sag genau das in einem Satz.'
+          printf '%s\n\n' "$anweisung" > auftrag.txt
+          cat messung.md >> auftrag.txt
+          copilot -p "$(cat auftrag.txt)" -s --no-ask-user > einordnung.txt 2> fehler.txt
+          stand=$?
+          if [ "$stand" -ne 0 ]; then
+            echo "::warning::Die Copilot-CLI ist mit Exit $stand ausgestiegen. Der Bericht kommt ohne Einordnung; ihre Meldung steht darunter."
+            echo "--- Meldung der CLI ---"
+            cat fehler.txt
+            echo "--- Ende ---"
+            rm -f einordnung.txt
+          elif [ ! -s einordnung.txt ]; then
+            echo "::warning::Die CLI ist ohne Fehler ausgestiegen, hat aber nichts geantwortet."
+            cat fehler.txt
+            rm -f einordnung.txt
+          else
+            echo "Einordnung: $(wc -c < einordnung.txt) Zeichen."
+          fi
+          exit 0
 
       - name: Bericht ablegen
         env:
@@ -133,7 +152,6 @@ jobs:
           LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           AUFFAELLIG: ${{ steps.messen.outputs.auffaellig }}
           TOKEN_DA: ${{ steps.token.outputs.da }}
-          ANTWORT: ${{ steps.ki.outputs.response }}
         run: |
           set -euo pipefail
           {
@@ -141,8 +159,8 @@ jobs:
             echo
             echo "## Was die KI dazu sagt"
             echo
-            if [ -n "${ANTWORT:-}" ]; then
-              printf '%s\n' "$ANTWORT"
+            if [ -s einordnung.txt ]; then
+              cat einordnung.txt
               echo
               echo "_Eingeordnet von einem Sprachmodell. Die Zahlen darunter sind"
               echo "gemessen, dieser Absatz ist es nicht._"
@@ -153,8 +171,10 @@ jobs:
               echo "gemessen, nicht erfragt."
             else
               echo "**Keine Einordnung: der KI-Dienst hat nicht geantwortet.**"
-              echo "Der Grund steht im Protokoll des Laufs. Die Zahlen unten sind davon"
-              echo "unberührt — sie sind gemessen, nicht erfragt."
+              echo "Die Meldung der CLI steht im Protokoll des Laufs, im Schritt"
+              echo "\`Die KI einordnen lassen\` zwischen \`--- Meldung der CLI ---\` und"
+              echo "\`--- Ende ---\`. Die Zahlen unten sind davon unberührt — sie sind"
+              echo "gemessen, nicht erfragt."
             fi
             echo
             cat messung.md
