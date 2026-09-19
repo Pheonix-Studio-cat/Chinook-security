@@ -38,7 +38,7 @@ findings and keeps the bots honest, the **website** and the **weekly run**.
 | **Website** | ✅ generated from the source, GitHub Pages |
 | **Weekly run** | ✅ Mondays, without a commit |
 
-**223 checks, all green. 47 mutations, all caught.**
+**248 checks, all green. 47 mutations, all caught.**
 
 **No dependencies.** The Python standard library only. A security tool with
 three hundred transitive packages is an attack surface itself, and a lockfile
@@ -465,6 +465,34 @@ that no workflow ever points at the dead endpoint again.
 **The AI reads. It does not write.** It changes no code and opens no pull
 request; that would need an agent, and an agent costs money. This project has
 none.
+
+## The AI reviewer
+
+`.github/workflows/ki-pruefer.yml` reads the code and files findings as
+issues. It runs **on every push and once a day** — not fifty times. Unchanged
+code gives the same answer; running it fifty times finds the same thing fifty
+times and costs fifty times as much.
+
+The point of it is not the asking — that is three lines. The point is the
+three barriers in `.github/ki-pruefer.py`, because "open an issue for every
+error" taken literally produces an avalanche:
+
+| Barrier | Why |
+| --- | --- |
+| **Recognition** | Each finding gets a fingerprint from file + title, stored as an HTML comment in the issue body. A finding that already has an open issue does not get a second one. Not the line number — that shifts the moment someone inserts a line above. |
+| **Ceiling** | At most five new issues per run, the more severe first. More than that and the run says so rather than pouring them out. |
+| **Labelling** | Every issue states that a language model reported it and **nobody verified it** — and that closing it is a valid outcome. An unverified finding that looks verified is worse than none. |
+
+Severity `niedrig` is never filed. Taste does not belong in an issue someone
+is supposed to work through.
+
+An unreadable model answer exits `2` and is never treated as "no findings" —
+the same distinction the counterproof makes. Without it, every model hiccup
+would report "all clear".
+
+Without the `COPILOT_PAT` secret the run says so and stops **without going
+red**. A repository that blinks red daily for no reason teaches you to
+overlook red.
 
 ## The counterproof
 
