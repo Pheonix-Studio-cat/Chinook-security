@@ -51,6 +51,13 @@ ERLAUBTER_COMMIT = "2c43c91ae16266ca159d311430343c67a5ffa222"  # v3
 
 BENUTZT = re.compile(r"^\s*uses:\s*actions/ai-inference@(\S+)", re.MULTILINE)
 
+# Seit dem Umbau ruft `frag-die-ki.yml` die CLI **direkt** auf, ohne die
+# Action. Wuerde nur nach der Action gesucht, fiele diese Datei still aus der
+# Pruefung -- und die uebrigen Tests waeren weiter gruen, ohne sie je
+# angesehen zu haben. Genau die Sorte Luecke, die hier schon zweimal Erfolg
+# vorgetaeuscht hat.
+RUFT_CLI = re.compile(r"copilot\s+-p\b")
+
 
 def _workflows():
     for name in sorted(os.listdir(WORKFLOWS)):
@@ -61,13 +68,20 @@ def _workflows():
 
 
 def _mit_ki():
+    """Jeder Workflow, der irgendwie ein Sprachmodell befragt."""
     for name, text in _workflows():
         treffer = BENUTZT.findall(text)
-        if treffer:
+        if treffer or RUFT_CLI.search(text):
             yield name, text, treffer
 
 
 class KiWorkflows(unittest.TestCase):
+    def test_beide_wege_sind_erfasst(self):
+        """Es gibt zwei: die Action und der direkte Aufruf. Beide gehoeren dazu."""
+        namen = {name for name, _t, _x in _mit_ki()}
+        self.assertIn("frag-die-ki.yml", namen, "der Knopf faellt aus der Pruefung")
+        self.assertIn("ki-wochenbericht.yml", namen, "der Wochenbericht faellt aus der Pruefung")
+
     def test_es_gibt_ueberhaupt_einen(self):
         """Ohne diesen Fall pruefen die anderen Tests die leere Menge.
 
@@ -97,6 +111,31 @@ class KiWorkflows(unittest.TestCase):
                 f"Token ueber COPILOT_GITHUB_TOKEN mit. Der eingebaute "
                 f"GITHUB_TOKEN genuegt der Copilot-CLI nicht -- sie antwortet "
                 f"mit 'Authentication failed'.",
+            )
+
+    def test_fehlschlag_wird_nicht_verschluckt(self):
+        """Wer die CLI selbst aufruft, muss ihre Meldung auch zeigen.
+
+        `actions/ai-inference` meldet nur "exited with code 1" und
+        verschluckt die stderr der CLI. Das hat hier zwei Laeufe gekostet.
+        Wer den Weg daran vorbei nimmt, gibt die Meldung aus -- sonst ist
+        nichts gewonnen.
+        """
+        for name, text, _treffer in _mit_ki():
+            if not RUFT_CLI.search(text):
+                continue
+            self.assertIn(
+                "cat fehler.txt",
+                text,
+                f"{name} ruft die CLI direkt auf, gibt ihre Fehlerausgabe "
+                f"aber nirgends aus. Dann ist der direkte Aufruf sinnlos.",
+            )
+            self.assertIn(
+                "set +e",
+                text,
+                f"{name} wertet einen Fehlschlag aus, hebt aber das `-e` "
+                f"nicht auf. GitHub startet jeden run-Block mit `bash -e`; "
+                f"der Block braeche vor der Ausgabe ab.",
             )
 
     def test_cli_wird_installiert(self):
