@@ -78,7 +78,44 @@ jobs:
             echo "::error::Das Secret COPILOT_PAT fehlt. Gebraucht wird ein Fine-Grained Personal Access Token mit dem Recht 'Copilot Requests', hinterlegt unter Settings -> Secrets and variables -> Actions. Ohne das Token weist die Copilot-CLI die Anfrage mit 'Authentication failed' zurueck."
             exit 1
           fi
-          echo "Token ist hinterlegt."
+          # Ueber den **Wert** wird hier nichts ausgegeben -- nur Laenge und
+          # Form. Beides genuegt, um die haeufigste Ursache zu erkennen: ein
+          # am Tablet unvollstaendig kopiertes Token. Die CLI sagt dazu nur
+          # "Bad credentials" und laesst offen, ob der Wert falsch ist oder
+          # ein Recht fehlt.
+          laenge=${#TOKEN}
+          echo "Token hinterlegt, $laenge Zeichen."
+          case "$TOKEN" in
+            github_pat_*) echo "Form: Fine-Grained PAT. Richtig." ;;
+            ghp_*) echo "::warning::Form: klassisches Token (ghp_). Die Copilot-CLI will ein Fine-Grained PAT." ;;
+            *) echo "::warning::Das Token beginnt weder mit github_pat_ noch mit ghp_ -- vermutlich unvollstaendig kopiert." ;;
+          esac
+          if [ "$laenge" -lt 40 ]; then
+            echo "::warning::Nur $laenge Zeichen. Ein Fine-Grained PAT ist deutlich laenger; das sieht abgeschnitten aus."
+          fi
+          # Fuehrende oder nachgestellte Leerzeichen ueberleben das Einfuegen
+          # und machen jeden Kopfzeileneintrag ungueltig.
+          beschnitten=$(printf '%s' "$TOKEN" | tr -d ' \t\n\r')
+          if [ "${#beschnitten}" -ne "$laenge" ]; then
+            echo "::error::Im Secret stehen Leerzeichen oder ein Zeilenumbruch. Neu einfuegen, ohne Rand."
+            exit 1
+          fi
+
+          # Die entscheidende Unterscheidung: liegt es am Wert oder am Recht?
+          # Diese Anfrage braucht **kein** besonderes Recht. Kommt hier 401,
+          # ist der Wert falsch; kommt 200, ist der Wert gut und es fehlt das
+          # Copilot-Recht.
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" https://api.github.com/user)
+          echo "GitHub-API /user antwortet: HTTP $code"
+          if [ "$code" = "401" ]; then
+            echo "::error::HTTP 401 -- GitHub kennt dieses Token nicht. Der Wert im Secret ist falsch, abgelaufen oder unvollstaendig. Neu erzeugen unter Settings -> Developer settings -> Personal access tokens -> Fine-grained, den Wert mit dem Kopier-Knopf uebernehmen und das Secret COPILOT_PAT ersetzen."
+            exit 1
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::Unerwartete Antwort HTTP $code von der GitHub-API. Der Grund steht nicht hier; ohne gueltiges Token braucht die CLI gar nicht erst zu starten."
+            exit 1
+          fi
+          echo "Das Token ist gueltig. Bleibt die Frage, ob es Copilot darf -- das sagt die CLI gleich selbst."
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
