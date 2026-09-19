@@ -38,7 +38,7 @@ findings and keeps the bots honest, the **website** and the **weekly run**.
 | **Website** | ✅ generated from the source, GitHub Pages |
 | **Weekly run** | ✅ Mondays, without a commit |
 
-**248 checks, all green. 47 mutations, all caught.**
+**255 checks, all green. 47 mutations, all caught.**
 
 **No dependencies.** The Python standard library only. A security tool with
 three hundred transitive packages is an attack surface itself, and a lockfile
@@ -469,22 +469,52 @@ none.
 ## The AI reviewer
 
 `.github/workflows/ki-pruefer.yml` reads the code and files findings as
-issues. It runs **on every push and once a day** — not fifty times. Unchanged
-code gives the same answer; running it fifty times finds the same thing fifty
-times and costs fifty times as much.
+issues. It runs **on every push to `main` and once a day** — not fifty times.
+Unchanged code gives the same answer; running it fifty times finds the same
+thing fifty times and costs fifty times as much.
 
-The point of it is not the asking — that is three lines. The point is the
-three barriers in `.github/ki-pruefer.py`, because "open an issue for every
-error" taken literally produces an avalanche:
+The point is not the asking — that is three lines. The point is not producing
+an avalanche, because "open an issue for every error" taken literally does.
 
-| Barrier | Why |
+### The idea that had to be measured and thrown away
+
+The first version recognised a finding by a fingerprint of file + title. On
+the second run the model called the same finding *"Nicht-String-Felder des
+Modells verursachen einen Absturz"* and then *"Nicht-stringartige Felder
+führen später zum Absturz"*. Two fingerprints, two issues — within the hour.
+
+The obvious fix was to compare titles by **similarity**. Measured against the
+real cases before building it:
+
+| | similarity |
 | --- | --- |
-| **Recognition** | Each finding gets a fingerprint from file + title, stored as an HTML comment in the issue body. A finding that already has an open issue does not get a second one. Not the line number — that shifts the moment someone inserts a line above. |
-| **Ceiling** | At most five new issues per run, the more severe first. More than that and the run says so rather than pouring them out. |
-| **Labelling** | Every issue states that a language model reported it and **nobody verified it** — and that closing it is a valid outcome. An unverified finding that looks verified is worse than none. |
+| actual duplicates | 0.59, 0.89 |
+| genuinely different findings | 0.26, 0.33, **0.86**, **0.90** |
 
-Severity `niedrig` is never filed. Taste does not belong in an issue someone
-is supposed to work through.
+The ranges overlap completely. "Missing null check in `lade_datei`" and
+"… in `speichere_datei`" are 86% similar and are two different bugs. **No
+threshold separates them**, so the heuristic was not built. A test records
+both measurements so nobody quietly reinvents it.
+
+### What it does instead
+
+**One issue per file, not per finding**, and every run rewrites its body.
+Recognition is then exact rather than estimated: the path is the key. How the
+model phrases things stops mattering, because the text is replaced anyway. A
+fixed finding disappears by itself, and a file with nothing left gets its
+issue **closed**.
+
+Only files *this run actually read* can have their issues closed — on a push
+that is the changed files, so a push never clears the rest of the list.
+
+The price is coarser granularity: one issue can carry several findings. Worth
+it. Precision that produces an avalanche is not precision.
+
+| Remaining barrier | Why |
+| --- | --- |
+| **Ceiling** | At most five newly *created* issues per run. Updating cannot flood — the count stays the same. |
+| **Labelling** | Every issue states a model reported it and **nobody verified it**, and that closing it is a valid outcome. |
+| **Severity** | `niedrig` is never filed. Taste does not belong in an issue someone must work through. |
 
 An unreadable model answer exits `2` and is never treated as "no findings" —
 the same distinction the counterproof makes. Without it, every model hiccup
@@ -493,6 +523,11 @@ would report "all clear".
 Without the `COPILOT_PAT` secret the run says so and stops **without going
 red**. A repository that blinks red daily for no reason teaches you to
 overlook red.
+
+The bot's first real run found three genuine bugs in the bot itself: no
+de-duplication within a single answer, a crash on non-string fields, and
+recognition going blind past 500 open issues. All three are fixed, and the
+issues it filed for them are what prompted this rewrite.
 
 ## The counterproof
 

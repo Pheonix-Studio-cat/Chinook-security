@@ -1,17 +1,26 @@
-"""Prueft den KI-Pruefer -- vor allem die drei Schranken gegen die Flut.
+"""Prueft den KI-Pruefer -- vor allem die Schranken gegen die Flut.
 
 Der Auftrag lautete „bei jedem Fehler ein neues Issue". Woertlich umgesetzt
-waere das eine Lawine: derselbe Code gibt dieselbe Antwort, und ein Modell,
-das nach Fehlern gefragt wird, findet auch dort welche, wo keine sind.
+waere das eine Lawine, aus drei Gruenden: derselbe Code gibt dieselbe
+Antwort, ein Modell findet immer etwas, und **es formuliert jedes Mal
+anders**.
 
-Die drei Schranken sind damit **das Wesentliche an diesem Bot**, nicht
-Beiwerk -- und deshalb stehen sie hier einzeln unter Beobachtung:
-Wiedererkennung, Obergrenze, Kennzeichnung.
+Am dritten ist die erste Fassung gescheitert. Sie erkannte einen Befund an
+Datei + Titel wieder; das Modell nannte denselben Befund im zweiten Lauf
+anders, und es standen Dubletten im Repo.
+
+Der naheliegende Ausweg -- Titel auf **Aehnlichkeit** vergleichen -- ist
+gemessen und verworfen worden: echte Dubletten lagen bei 0.59 und 0.89,
+wirklich verschiedene Befunde bei bis zu 0.90. Die Bereiche ueberlappen
+vollstaendig, es gibt keine Schwelle. Deshalb steht hier auch ein Test, der
+genau diese beiden Faelle festhaelt -- damit niemand die Heuristik in einem
+stillen Moment doch noch einbaut.
+
+Stattdessen: **ein Issue pro Datei**, dessen Text bei jedem Lauf neu
+geschrieben wird. Die Wiedererkennung ist damit exakt statt geschaetzt.
 
 Dazu die Unterscheidung, die dieses Projekt schon mehrfach gerettet hat:
-**eine unlesbare Antwort ist nicht dasselbe wie keine Befunde.** Das erste
-ist ein Fehlschlag, das zweite ein Ergebnis. Wer beides gleich behandelt,
-baut einen Bot, der bei jedem Modellfehler „alles in Ordnung" meldet.
+**eine unlesbare Antwort ist nicht dasselbe wie keine Befunde.**
 """
 
 from __future__ import annotations
@@ -74,93 +83,144 @@ class AntwortLesen(unittest.TestCase):
             pruefer.befunde_aus_text('[{"titel":"A","datei":"a.py","schwere":"katastrophal","begruendung":"x"}]')
 
 
+class NichtNochEinmalAehnlichkeit(unittest.TestCase):
+    """Haelt fest, warum Titel-Aehnlichkeit nicht taugt.
+
+    Ohne diesen Test sieht die Idee beim naechsten Lesen wieder klug aus.
+    """
+
+    def _aehnlich(self, a, b):
+        import difflib
+        import re as _re
+
+        n = lambda s: _re.sub(r"\s+", " ", s.strip().lower())
+        return difflib.SequenceMatcher(None, n(a), n(b)).ratio()
+
+    def test_echte_dublette_kann_unaehnlich_sein(self):
+        wert = self._aehnlich(
+            "Nicht-String-Felder des Modells verursachen einen Absturz",
+            "Nicht-stringartige Felder führen später zum Absturz",
+        )
+        self.assertLess(wert, 0.7, "gemessen 0.59 -- und das war dieselbe Sache")
+
+    def test_verschiedene_befunde_koennen_sehr_aehnlich_sein(self):
+        wert = self._aehnlich(
+            "Nicht behandelter Fehlerfall beim Lesen",
+            "Nicht behandelter Fehlerfall beim Schreiben",
+        )
+        self.assertGreater(wert, 0.85, "gemessen 0.90 -- und das sind zwei Fehler")
+
+
+class Gruppieren(unittest.TestCase):
+    def test_nach_datei_zusammengefasst(self):
+        gruppen = pruefer.nach_dateien([_befund(datei="a.py"), _befund(titel="Zweites", datei="a.py")])
+        self.assertEqual(list(gruppen), ["a.py"])
+        self.assertEqual(len(gruppen["a.py"]), 2)
+
+    def test_verschiedene_dateien_bleiben_getrennt(self):
+        gruppen = pruefer.nach_dateien([_befund(datei="a.py"), _befund(datei="b.py")])
+        self.assertEqual(sorted(gruppen), ["a.py", "b.py"])
+
+    def test_niedrig_faellt_raus(self):
+        self.assertEqual(pruefer.nach_dateien([_befund(schwere="niedrig")]), {})
+
+    def test_schweres_steht_oben(self):
+        gruppen = pruefer.nach_dateien(
+            [_befund(titel="mittel", schwere="mittel"), _befund(titel="hoch", schwere="hoch")]
+        )
+        self.assertEqual([b["titel"] for b in gruppen["app.py"]], ["hoch", "mittel"])
+
+
 class Wiedererkennung(unittest.TestCase):
-    def test_gleicher_befund_gleicher_abdruck(self):
-        self.assertEqual(pruefer.fingerabdruck(_befund()), pruefer.fingerabdruck(_befund()))
+    def test_marke_ueberlebt_den_weg_durch_ein_issue(self):
+        text = pruefer.issue_text("src/a.py", [_befund()], "o/r", "u")
+        self.assertEqual(pruefer.dateien_aus_issues([{"body": text}]), {"src/a.py": {"body": text}})
 
-    def test_verschobene_zeile_bleibt_derselbe_befund(self):
-        """Sonst waere jede eingefuegte Zeile weiter oben ein neues Issue."""
-        self.assertEqual(
-            pruefer.fingerabdruck(_befund(zeile=12)),
-            pruefer.fingerabdruck(_befund(zeile=340)),
-        )
-
-    def test_grossschreibung_und_leerraum_aendern_nichts(self):
-        self.assertEqual(
-            pruefer.fingerabdruck(_befund(titel="Ungepruefte  Eingabe")),
-            pruefer.fingerabdruck(_befund(titel="ungepruefte eingabe")),
-        )
-
-    def test_andere_datei_ist_ein_anderer_befund(self):
-        self.assertNotEqual(
-            pruefer.fingerabdruck(_befund(datei="a.py")),
-            pruefer.fingerabdruck(_befund(datei="b.py")),
-        )
-
-    def test_abdruck_ueberlebt_den_weg_durch_ein_issue(self):
-        """Der ganze Zweck: aus dem eigenen Issue-Text wieder herauslesbar."""
-        befund = _befund()
-        text = pruefer.issue_text(befund, "o/r", "https://example.invalid/1")
-        gelesen = pruefer.abdruecke_aus_issues([{"body": text}])
-        self.assertEqual(gelesen, {pruefer.fingerabdruck(befund)})
+    def test_umformulierter_titel_aendert_nichts(self):
+        """Der Fall, an dem die erste Fassung gescheitert ist."""
+        erst = pruefer.issue_text("a.py", [_befund(titel="Nicht-String-Felder stuerzen ab")], "o/r", "u")
+        bestehend = pruefer.dateien_aus_issues([{"body": erst, "number": 7}])
+        gefunden = pruefer.nach_dateien([_befund(titel="Nicht-stringartige Felder brechen spaeter", datei="a.py")])
+        anlegen, aktualisieren, _s, _z = pruefer.plan(gefunden, bestehend, ["a.py"])
+        self.assertEqual(anlegen, [], "haette ein zweites Issue angelegt -- genau der alte Fehler")
+        self.assertEqual(aktualisieren, ["a.py"])
 
     def test_issue_ohne_marke_stoert_nicht(self):
-        self.assertEqual(pruefer.abdruecke_aus_issues([{"body": "von Hand geschrieben"}]), set())
+        self.assertEqual(pruefer.dateien_aus_issues([{"body": "von Hand"}]), {})
 
     def test_issue_ganz_ohne_text(self):
-        self.assertEqual(pruefer.abdruecke_aus_issues([{"body": None}]), set())
+        self.assertEqual(pruefer.dateien_aus_issues([{"body": None}]), {})
 
 
-class Schranken(unittest.TestCase):
-    def test_bekannter_befund_wird_nicht_erneut_gemeldet(self):
-        befund = _befund()
-        neu, alt, _ = pruefer.auswaehlen([befund], {pruefer.fingerabdruck(befund)})
-        self.assertEqual(neu, [])
-        self.assertEqual(len(alt), 1)
+class DerPlan(unittest.TestCase):
+    def test_neue_datei_wird_angelegt(self):
+        anlegen, akt, zu, _z = pruefer.plan(pruefer.nach_dateien([_befund(datei="a.py")]), {}, ["a.py"])
+        self.assertEqual((anlegen, akt, zu), (["a.py"], [], []))
 
-    def test_unbekannter_befund_wird_gemeldet(self):
-        neu, alt, _ = pruefer.auswaehlen([_befund()], set())
-        self.assertEqual(len(neu), 1)
-        self.assertEqual(alt, [])
+    def test_bekannte_datei_wird_aktualisiert(self):
+        anlegen, akt, zu, _z = pruefer.plan(
+            pruefer.nach_dateien([_befund(datei="a.py")]), {"a.py": {"number": 1}}, ["a.py"]
+        )
+        self.assertEqual((anlegen, akt, zu), ([], ["a.py"], []))
 
-    def test_obergrenze_haelt(self):
-        viele = [_befund(titel=f"Befund {i}") for i in range(20)]
-        neu, _alt, zurueck = pruefer.auswaehlen(viele, set())
-        self.assertEqual(len(neu), pruefer.GRENZE)
-        self.assertEqual(zurueck, 20 - pruefer.GRENZE)
+    def test_saubere_datei_wird_geschlossen(self):
+        anlegen, akt, zu, _z = pruefer.plan({}, {"a.py": {"number": 1}}, ["a.py"])
+        self.assertEqual((anlegen, akt, zu), ([], [], ["a.py"]))
 
-    def test_schweres_zuerst_wenn_die_grenze_greift(self):
-        """Die Obergrenze darf nicht ausgerechnet das Wichtige abschneiden."""
-        viele = [_befund(titel=f"mittel {i}", schwere="mittel") for i in range(10)]
-        viele.append(_befund(titel="das Schwere", schwere="hoch"))
-        neu, _alt, _z = pruefer.auswaehlen(viele, set())
-        self.assertIn("das Schwere", [b["titel"] for b in neu])
+    def test_nicht_angesehene_datei_wird_nie_geschlossen(self):
+        """Sonst raeumte jeder Push die Issues aller unberuehrten Dateien ab."""
+        anlegen, akt, zu, _z = pruefer.plan({}, {"b.py": {"number": 2}}, ["a.py"])
+        self.assertEqual(zu, [], "b.py wurde gar nicht angesehen und geht diesen Lauf nichts an")
 
-    def test_niedrig_wird_gar_nicht_gemeldet(self):
-        neu, alt, zurueck = pruefer.auswaehlen([_befund(schwere="niedrig")], set())
-        self.assertEqual((neu, alt, zurueck), ([], [], 0))
+    def test_obergrenze_gilt_nur_fuers_anlegen(self):
+        viele = pruefer.nach_dateien([_befund(datei=f"d{i}.py") for i in range(12)])
+        anlegen, _a, _z2, zurueck = pruefer.plan(viele, {}, list(viele))
+        self.assertEqual(len(anlegen), pruefer.GRENZE)
+        self.assertEqual(zurueck, 12 - pruefer.GRENZE)
+
+    def test_aktualisieren_kennt_keine_obergrenze(self):
+        """Aktualisieren kann keine Flut ausloesen -- die Zahl bleibt gleich."""
+        viele = pruefer.nach_dateien([_befund(datei=f"d{i}.py") for i in range(12)])
+        bestehend = {f"d{i}.py": {"number": i} for i in range(12)}
+        _a, aktualisieren, _z, zurueck = pruefer.plan(viele, bestehend, list(viele))
+        self.assertEqual(len(aktualisieren), 12)
+        self.assertEqual(zurueck, 0)
 
 
 class Kennzeichnung(unittest.TestCase):
     def test_der_warnhinweis_steht_drin(self):
-        text = pruefer.issue_text(_befund(), "o/r", "https://example.invalid/1")
-        self.assertIn("Niemand hat das geprüft", text)
+        self.assertIn("Niemand hat das geprüft", pruefer.issue_text("a.py", [_befund()], "o/r", "u"))
 
     def test_schliessen_ist_ausdruecklich_erlaubt(self):
-        """Sonst sammeln sich falsche Befunde an, weil niemand sie zuzumachen wagt."""
-        text = pruefer.issue_text(_befund(), "o/r", "https://example.invalid/1")
-        self.assertIn("schliessen", text)
+        self.assertIn("schliessen", pruefer.issue_text("a.py", [_befund()], "o/r", "u"))
 
-    def test_ort_und_lauf_stehen_drin(self):
-        text = pruefer.issue_text(_befund(datei="src/x.py", zeile=7), "o/r", "https://example.invalid/42")
-        self.assertIn("src/x.py", text)
-        self.assertIn("Zeile 7", text)
-        self.assertIn("https://example.invalid/42", text)
+    def test_es_steht_drin_dass_der_text_ersetzt_wird(self):
+        """Sonst schreibt jemand Notizen hinein, die der naechste Lauf loescht."""
+        text = pruefer.issue_text("a.py", [_befund()], "o/r", "u")
+        self.assertIn("neu geschrieben", text)
+        self.assertIn("Kommentar", text)
+
+    def test_alle_befunde_der_datei_stehen_drin(self):
+        text = pruefer.issue_text("a.py", [_befund(titel="Erstes"), _befund(titel="Zweites")], "o/r", "u")
+        self.assertIn("Erstes", text)
+        self.assertIn("Zweites", text)
 
     def test_ohne_zeile_kein_leeres_zeile(self):
         befund = _befund()
         del befund["zeile"]
-        self.assertNotIn("Zeile", pruefer.issue_text(befund, "o/r", "u"))
+        self.assertNotIn("Zeile", pruefer.issue_text("a.py", [befund], "o/r", "u"))
+
+
+class NichtTextFelder(unittest.TestCase):
+    """Vom Pruefer an sich selbst gefunden (Issue #15/#18)."""
+
+    def test_zahl_statt_titel(self):
+        with self.assertRaises(pruefer.Unbrauchbar):
+            pruefer.befunde_aus_text('[{"titel":42,"datei":"a.py","schwere":"hoch","begruendung":"x"}]')
+
+    def test_liste_statt_begruendung(self):
+        with self.assertRaises(pruefer.Unbrauchbar):
+            pruefer.befunde_aus_text('[{"titel":"A","datei":"a.py","schwere":"hoch","begruendung":["x"]}]')
 
 
 if __name__ == "__main__":

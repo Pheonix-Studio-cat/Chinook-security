@@ -2,28 +2,64 @@
 """Macht aus den Befunden eines Sprachmodells Issues -- ohne Flut.
 
 Der Auftrag war: „bei jedem Fehler ein neues Issue". Wörtlich genommen
-entsteht daraus **eine Lawine**, und zwar aus zwei Gründen, die beide nichts
+entsteht daraus **eine Lawine**, und zwar aus drei Gründen, die alle nichts
 mit dem Code zu tun haben:
 
 1. **Derselbe Code gibt dieselbe Antwort.** Läuft der Prüfer zweimal über
-   unveränderten Code, findet er zweimal dasselbe. Ohne Wiedererkennung wären
-   das zwei Issues, nach einer Woche vierzehn.
+   unveränderten Code, findet er zweimal dasselbe.
 2. **Ein Sprachmodell findet immer etwas.** Gefragt „was ist hier falsch",
-   antwortet es auch dort, wo nichts falsch ist. Das ist keine Bosheit,
-   sondern die Form der Frage.
+   antwortet es auch dort, wo nichts falsch ist.
+3. **Und es formuliert jedes Mal anders.** Das ist der Grund, an dem die
+   erste Fassung gescheitert ist.
 
-Deshalb drei Schranken, und jede hat einen Grund:
+## Was nicht funktioniert hat, und warum das hier steht
 
-* **Wiedererkennung.** Jeder Befund bekommt einen Fingerabdruck aus Datei und
-  Titel. Steht dazu schon ein offenes Issue, wird **keins** angelegt.
-* **Obergrenze.** Höchstens `GRENZE` neue Issues pro Lauf. Findet das Modell
-  mehr, sagt der Lauf das laut -- aber er schüttet sie nicht aus.
-* **Kennzeichnung.** In jedem Issue steht, dass ein Sprachmodell den Befund
-  gemeldet hat und **niemand ihn geprüft** hat. Ein unbestätigter Befund, der
-  aussieht wie ein bestätigter, ist schlimmer als keiner.
+Die erste Fassung erkannte einen Befund an einem Fingerabdruck aus Datei und
+Titel wieder. Beim zweiten Lauf nannte das Modell denselben Befund einmal
+„Nicht-String-Felder des Modells verursachen einen Absturz" und einmal
+„Nicht-stringartige Felder führen später zum Absturz". Zwei Fingerabdrücke,
+zwei Issues -- innerhalb einer Stunde.
 
-Der Fingerabdruck steht als HTML-Kommentar im Text des Issues. Das ist die
-einzige Stelle, an der er überlebt -- Titel ändern sich, Beschriftungen auch.
+Der naheliegende Ausweg war eine **Ähnlichkeit** zwischen den Titeln. Bevor
+ich ihn eingebaut habe, habe ich die Schwelle an den echten Fällen gemessen:
+
+| | Ähnlichkeit |
+| --- | --- |
+| echte Dubletten | 0.59, 0.89 |
+| wirklich verschiedene Befunde | 0.26, 0.33, **0.86**, **0.90** |
+
+**Die Bereiche überlappen vollständig.** „Fehlende Null-Prüfung in
+`lade_datei`" und „... in `speichere_datei`" sind zu 86 % ähnlich und
+trotzdem zwei verschiedene Fehler. Es gibt keine Schwelle, die das trennt.
+Die Heuristik ist deshalb **nicht** eingebaut -- sie hätte gut ausgesehen und
+mal zu viel, mal zu wenig zusammengeworfen.
+
+## Was stattdessen
+
+**Ein Issue pro Datei, nicht pro Befund.** Alle Befunde zu einer Datei stehen
+in einem Issue, und jeder Lauf schreibt dessen Text neu.
+
+Damit ist die Wiedererkennung keine Schätzung mehr, sondern exakt: der
+Dateipfad ist der Schlüssel. Wie das Modell formuliert, spielt keine Rolle
+mehr, weil der Text ohnehin ersetzt wird. Ein behobener Fehler verschwindet
+beim nächsten Lauf von selbst, und findet ein Lauf in einer Datei gar nichts
+mehr, wird ihr Issue **geschlossen**.
+
+Der Preis ist gröber: ein Issue kann mehrere Befunde tragen. Das ist es wert.
+Genauigkeit, die eine Lawine erzeugt, ist keine.
+
+## Die übrigen Schranken
+
+* **Obergrenze** -- höchstens `GRENZE` neu angelegte Issues pro Lauf.
+* **Kennzeichnung** -- in jedem Issue steht, dass ein Sprachmodell die
+  Befunde gemeldet hat und **niemand sie geprüft** hat. Ein unbestätigter
+  Befund, der aussieht wie ein bestätigter, ist schlimmer als keiner.
+* **Nur `hoch` und `mittel`** -- Geschmack gehört nicht in ein Issue, das
+  jemand abarbeiten soll.
+
+Geschlossen wird nur, was **dieser Lauf angesehen hat**. Bei einem Push sind
+das nur die geänderten Dateien; die Issues aller anderen bleiben, wo sie
+sind. Sonst löschte jeder Push die halbe Liste.
 
 Keine Abhängigkeiten: Standardbibliothek, wie alles hier.
 """
@@ -31,7 +67,6 @@ Keine Abhängigkeiten: Standardbibliothek, wie alles hier.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -39,34 +74,30 @@ import sys
 import urllib.error
 import urllib.request
 
-# Höchstens so viele neue Issues pro Lauf. Lieber eine gedeckelte Meldung als
-# ein Repo, in dem niemand mehr etwas findet.
+# Hoechstens so viele **neu angelegte** Issues pro Lauf. Bestehende werden
+# immer aktualisiert -- das kann keine Flut ausloesen, weil die Zahl der
+# Issues dabei gleich bleibt.
 GRENZE = 5
 
-# Nur das hier wird gemeldet. „niedrig" ist Geschmack, und Geschmack gehört
+# Nur das hier wird gemeldet. „niedrig" ist Geschmack, und Geschmack gehoert
 # nicht in ein Issue, das jemand abarbeiten soll.
 GEMELDET = ("hoch", "mittel")
 
-MARKE = "ki-pruefer-fingerabdruck"
+MARKE = "ki-pruefer-datei"
 ETIKETT = "ki-befund"
 
 
 class Unbrauchbar(Exception):
     """Die Antwort des Modells liess sich nicht auswerten.
 
-    Ausdrücklich **kein** „dann eben null Befunde": eine unlesbare Antwort ist
-    etwas anderes als eine leere. Der Unterschied ist in diesem Projekt schon
-    einmal teuer gewesen.
+    Ausdruecklich **kein** „dann eben null Befunde": eine unlesbare Antwort
+    ist etwas anderes als eine leere. Wer beides gleich behandelt, baut einen
+    Bot, der bei jedem Modellschluckauf „alles in Ordnung" meldet.
     """
 
 
 def befunde_aus_text(text: str) -> list[dict]:
-    """Zieht die Liste der Befunde aus der Antwort des Modells.
-
-    Modelle verpacken JSON gern in ```-Blöcke oder schreiben einen Satz davor.
-    Beides wird abgeräumt; alles andere ist ein Fehler und kein Anlass zu
-    raten.
-    """
+    """Zieht die Liste der Befunde aus der Antwort des Modells."""
     if not text or not text.strip():
         raise Unbrauchbar("die Antwort war leer")
 
@@ -75,9 +106,7 @@ def befunde_aus_text(text: str) -> list[dict]:
     if block:
         roh = block.group(1).strip()
     else:
-        # Kein Block: die äusserste eckige Klammer nehmen.
-        auf = roh.find("[")
-        zu = roh.rfind("]")
+        auf, zu = roh.find("["), roh.rfind("]")
         if auf == -1 or zu == -1 or zu < auf:
             raise Unbrauchbar("in der Antwort steht keine JSON-Liste")
         roh = roh[auf : zu + 1]
@@ -97,79 +126,117 @@ def befunde_aus_text(text: str) -> list[dict]:
         fehlt = [f for f in ("titel", "datei", "schwere", "begruendung") if not eintrag.get(f)]
         if fehlt:
             raise Unbrauchbar(f"einem Befund fehlen Felder: {', '.join(fehlt)}")
+        # Ein Modell liefert auch schon mal eine Zahl, wo Text stehen soll.
+        # Ohne diese Pruefung stuerzt erst spaeter etwas ab, an einer Stelle,
+        # die nichts mit der Ursache zu tun hat. Vom Pruefer selbst gefunden.
+        for feld in ("titel", "datei", "schwere", "begruendung"):
+            if not isinstance(eintrag[feld], str):
+                raise Unbrauchbar(
+                    f"das Feld {feld!r} ist kein Text, sondern {type(eintrag[feld]).__name__}"
+                )
         if eintrag["schwere"] not in ("hoch", "mittel", "niedrig"):
             raise Unbrauchbar(f"unbekannte Schwere: {eintrag['schwere']!r}")
         sauber.append(eintrag)
     return sauber
 
 
-def fingerabdruck(befund: dict) -> str:
-    """Erkennt denselben Befund wieder, auch über Läufe hinweg.
+def nach_dateien(befunde: list[dict]) -> dict[str, list[dict]]:
+    """Gruppiert nach Datei -- der Schluessel, an dem wiedererkannt wird.
 
-    Datei und Titel, beide normalisiert. **Nicht** die Zeilennummer: die
-    verschiebt sich, sobald jemand oben eine Zeile einfügt, und dann wäre
-    derselbe Befund plötzlich ein neuer.
+    Nur `hoch` und `mittel`. Und innerhalb einer Datei wird nach Schwere
+    sortiert, damit im Issue oben steht, was oben stehen soll.
     """
-    datei = (befund.get("datei") or "").strip().lower()
-    titel = re.sub(r"\s+", " ", (befund.get("titel") or "").strip().lower())
-    return hashlib.sha256(f"{datei}\n{titel}".encode()).hexdigest()[:16]
+    heraus: dict[str, list[dict]] = {}
+    for befund in befunde:
+        if befund["schwere"] not in GEMELDET:
+            continue
+        heraus.setdefault(befund["datei"].strip(), []).append(befund)
+    for liste in heraus.values():
+        liste.sort(key=lambda b: GEMELDET.index(b["schwere"]))
+    return heraus
 
 
-def marke_von(abdruck: str) -> str:
-    return f"<!-- {MARKE}: {abdruck} -->"
+def marke_von(datei: str) -> str:
+    return f"<!-- {MARKE}: {datei} -->"
 
 
-def abdruecke_aus_issues(issues: list[dict]) -> set[str]:
-    """Liest die Fingerabdrücke aus den Texten offener Issues."""
-    muster = re.compile(rf"<!--\s*{re.escape(MARKE)}:\s*([0-9a-f]+)\s*-->")
-    gefunden = set()
+def titel_von(datei: str) -> str:
+    return f"[KI] Befunde in {datei}"
+
+
+def dateien_aus_issues(issues: list[dict]) -> dict[str, dict]:
+    """Welche Datei gehoert zu welchem offenen Issue?
+
+    Gelesen wird die Marke im Text, nicht der Titel: Titel aendern Menschen,
+    Marken nicht.
+    """
+    muster = re.compile(rf"<!--\s*{re.escape(MARKE)}:\s*(.+?)\s*-->")
+    heraus: dict[str, dict] = {}
     for issue in issues:
-        gefunden.update(muster.findall(issue.get("body") or ""))
-    return gefunden
+        treffer = muster.search(issue.get("body") or "")
+        if treffer:
+            heraus[treffer.group(1)] = issue
+    return heraus
 
 
-def auswaehlen(befunde: list[dict], bekannt: set[str]) -> tuple[list[dict], list[dict], int]:
-    """Teilt die Befunde in: neu zu melden, schon bekannt, wegen Grenze zurueck."""
-    meldbar = [b for b in befunde if b["schwere"] in GEMELDET]
-    neu, alt = [], []
-    for befund in meldbar:
-        (alt if fingerabdruck(befund) in bekannt else neu).append(befund)
-    # Das Schwerere zuerst, damit die Obergrenze nicht das Wichtige abschneidet.
-    neu.sort(key=lambda b: GEMELDET.index(b["schwere"]))
-    zurueck = max(0, len(neu) - GRENZE)
-    return neu[:GRENZE], alt, zurueck
+def plan(
+    gefunden: dict[str, list[dict]],
+    bestehend: dict[str, dict],
+    angesehen: list[str],
+) -> tuple[list[str], list[str], list[str], int]:
+    """Was ist zu tun? (neu anlegen, aktualisieren, schliessen, zurueckgehalten)
+
+    `angesehen` sind die Dateien, die **dieser Lauf** gelesen hat. Nur deren
+    Issues duerfen geschlossen werden -- bei einem Push sind das wenige, und
+    alle anderen Issues gehen den Lauf nichts an. Ohne diese Einschraenkung
+    raeumte jeder Push die halbe Liste ab.
+    """
+    anlegen = sorted(d for d in gefunden if d not in bestehend)
+    aktualisieren = sorted(d for d in gefunden if d in bestehend)
+    gesehen = set(angesehen)
+    schliessen = sorted(d for d in bestehend if d in gesehen and d not in gefunden)
+    zurueck = max(0, len(anlegen) - GRENZE)
+    return anlegen[:GRENZE], aktualisieren, schliessen, zurueck
 
 
-def issue_text(befund: dict, repo: str, lauf: str) -> str:
-    zeile = befund.get("zeile")
-    ort = f"`{befund['datei']}`" + (f", Zeile {zeile}" if zeile else "")
-    return f"""> ⚠️ **Von einem Sprachmodell gemeldet. Niemand hat das geprüft.**
-> Ein Modell, das nach Fehlern gefragt wird, findet auch dort welche, wo
-> keine sind. Bevor hier etwas geändert wird: nachsehen, ob der Befund
-> stimmt. Stimmt er nicht, schliessen — das ist ein gültiges Ergebnis.
+def issue_text(datei: str, befunde: list[dict], repo: str, lauf: str) -> str:
+    teile = [
+        "> ⚠️ **Von einem Sprachmodell gemeldet. Niemand hat das geprüft.**",
+        "> Ein Modell, das nach Fehlern gefragt wird, findet auch dort welche,",
+        "> wo keine sind. Bevor hier etwas geändert wird: nachsehen, ob der",
+        "> Befund stimmt. Stimmt er nicht, schliessen — das ist ein gültiges",
+        "> Ergebnis.",
+        "",
+        f"**Datei:** `{datei}`",
+        "",
+        "Dieses Issue wird bei jedem Lauf **neu geschrieben**. Was behoben ist,",
+        "verschwindet von selbst; ist gar nichts mehr zu finden, schliesst es sich.",
+        "Eigene Notizen gehören deshalb in einen Kommentar, nicht in diesen Text.",
+        "",
+    ]
+    for nummer, befund in enumerate(befunde, 1):
+        zeile = befund.get("zeile")
+        ort = f" (Zeile {zeile})" if zeile else ""
+        teile += [
+            f"## {nummer}. {befund['titel']}{ort}",
+            "",
+            f"**Schwere laut Modell:** {befund['schwere']}",
+            "",
+            befund["begruendung"],
+            "",
+        ]
+    teile += ["---", "", f"KI-Prüfer in `{repo}`. [Der Lauf]({lauf})", "", marke_von(datei), ""]
+    return "\n".join(teile)
 
-**Ort:** {ort}
-**Schwere (laut Modell):** {befund['schwere']}
 
-## Was das Modell sagt
-
-{befund['begruendung']}
-
----
-
-Gefunden vom KI-Prüfer in `{repo}`. [Der Lauf]({lauf})
-
-{marke_von(fingerabdruck(befund))}
-"""
+# --- Alles ab hier redet mit GitHub. Darueber nichts, damit es pruefbar bleibt.
 
 
-# --- Alles ab hier redet mit GitHub. Darüber nichts, damit es prüfbar bleibt.
-
-
-def _anfrage(pfad: str, token: str, daten: dict | None = None) -> object:
+def _anfrage(pfad: str, token: str, daten: dict | None = None, verfahren: str = "") -> object:
     ziel = f"https://api.github.com{pfad}"
     leib = json.dumps(daten).encode() if daten is not None else None
-    bitte = urllib.request.Request(ziel, data=leib, method="POST" if daten else "GET")
+    art = verfahren or ("POST" if daten else "GET")
+    bitte = urllib.request.Request(ziel, data=leib, method=art)
     bitte.add_header("Authorization", f"Bearer {token}")
     bitte.add_header("Accept", "application/vnd.github+json")
     if daten is not None:
@@ -181,33 +248,26 @@ def _anfrage(pfad: str, token: str, daten: dict | None = None) -> object:
 def offene_issues(repo: str, token: str) -> list[dict]:
     gesammelt: list[dict] = []
     seite = 1
-    while seite <= 5:  # 500 offene Issues sind genug; darüber hilft kein Bot mehr.
-        teil = _anfrage(f"/repos/{repo}/issues?state=open&per_page=100&page={seite}", token)
+    while True:
+        teil = _anfrage(f"/repos/{repo}/issues?state=open&labels={ETIKETT}&per_page=100&page={seite}", token)
         if not isinstance(teil, list) or not teil:
             break
         gesammelt.extend(teil)
         if len(teil) < 100:
             break
         seite += 1
+        if seite > 20:
+            # Nicht stillschweigend abschneiden: ab hier gaelte jede Datei
+            # dahinter als neu, und der Bot legte Dubletten an.
+            print("::warning::Mehr als 2000 offene KI-Issues -- ab hier ist die Wiedererkennung blind.")
+            break
     return gesammelt
-
-
-def issue_anlegen(repo: str, token: str, befund: dict, lauf: str) -> str:
-    antwort = _anfrage(
-        f"/repos/{repo}/issues",
-        token,
-        {
-            "title": f"[KI] {befund['titel']}",
-            "body": issue_text(befund, repo, lauf),
-            "labels": [ETIKETT],
-        },
-    )
-    return antwort.get("html_url", "?") if isinstance(antwort, dict) else "?"
 
 
 def main() -> int:
     zerleger = argparse.ArgumentParser(description="Befunde eines Modells zu Issues machen.")
     zerleger.add_argument("--antwort", required=True, help="Datei mit der Antwort des Modells")
+    zerleger.add_argument("--angesehen", required=True, help="Datei mit den gelesenen Pfaden, einer pro Zeile")
     zerleger.add_argument("--repo", required=True, help="owner/name")
     zerleger.add_argument("--lauf", default="", help="URL des Actions-Laufs")
     zerleger.add_argument("--trocken", action="store_true", help="nur sagen, nichts anlegen")
@@ -220,6 +280,8 @@ def main() -> int:
 
     with open(werte.antwort, encoding="utf-8") as datei:
         text = datei.read()
+    with open(werte.angesehen, encoding="utf-8") as datei:
+        angesehen = [z.strip() for z in datei if z.strip()]
 
     try:
         befunde = befunde_aus_text(text)
@@ -231,25 +293,49 @@ def main() -> int:
         print(text[:2000])
         return 2
 
-    if not befunde:
-        print("Das Modell hat nichts gefunden. Kein Issue.")
-        return 0
+    gefunden = nach_dateien(befunde)
+    bestehend = {} if werte.trocken else dateien_aus_issues(offene_issues(werte.repo, token))
+    anlegen, aktualisieren, schliessen, zurueck = plan(gefunden, bestehend, angesehen)
 
-    bekannt = set() if werte.trocken else abdruecke_aus_issues(offene_issues(werte.repo, token))
-    neu, alt, zurueck = auswaehlen(befunde, bekannt)
-
-    print(f"{len(befunde)} Befund(e), davon {len(alt)} bereits als Issue offen.")
+    print(f"{len(befunde)} Befund(e) in {len(gefunden)} Datei(en). {len(angesehen)} Datei(en) angesehen.")
     if zurueck:
-        print(f"::warning::{zurueck} weitere Befund(e) zurueckgehalten -- hoechstens {GRENZE} neue Issues pro Lauf.")
+        print(f"::warning::{zurueck} Datei(en) zurueckgehalten -- hoechstens {GRENZE} neue Issues pro Lauf.")
 
-    for befund in neu:
+    for datei in anlegen:
+        leib = issue_text(datei, gefunden[datei], werte.repo, werte.lauf)
         if werte.trocken:
-            print(f"[trocken] wuerde anlegen: [{befund['schwere']}] {befund['titel']}")
+            print(f"[trocken] neues Issue fuer {datei} ({len(gefunden[datei])} Befund(e))")
             continue
-        adresse = issue_anlegen(werte.repo, token, befund, werte.lauf)
-        print(f"Issue angelegt: {adresse}")
+        antwort = _anfrage(
+            f"/repos/{werte.repo}/issues",
+            token,
+            {"title": titel_von(datei), "body": leib, "labels": [ETIKETT]},
+        )
+        print(f"Angelegt: {antwort.get('html_url', '?') if isinstance(antwort, dict) else '?'}")
 
-    print(f"{len(neu)} neue(s) Issue(s).")
+    for datei in aktualisieren:
+        leib = issue_text(datei, gefunden[datei], werte.repo, werte.lauf)
+        if werte.trocken:
+            print(f"[trocken] Issue fuer {datei} neu schreiben")
+            continue
+        nummer = bestehend[datei]["number"]
+        _anfrage(f"/repos/{werte.repo}/issues/{nummer}", token, {"body": leib}, verfahren="PATCH")
+        print(f"Aktualisiert: #{nummer} ({datei})")
+
+    for datei in schliessen:
+        if werte.trocken:
+            print(f"[trocken] Issue fuer {datei} schliessen -- nichts mehr gefunden")
+            continue
+        nummer = bestehend[datei]["number"]
+        _anfrage(
+            f"/repos/{werte.repo}/issues/{nummer}/comments",
+            token,
+            {"body": "In dieser Datei findet der Prüfer nichts mehr. Wird geschlossen."},
+        )
+        _anfrage(f"/repos/{werte.repo}/issues/{nummer}", token, {"state": "closed"}, verfahren="PATCH")
+        print(f"Geschlossen: #{nummer} ({datei}) -- nichts mehr gefunden")
+
+    print(f"{len(anlegen)} neu, {len(aktualisieren)} aktualisiert, {len(schliessen)} geschlossen.")
     return 0
 
 

@@ -10,12 +10,17 @@
 #
 # Sie stehen in `.github/ki-pruefer.py` und sind der eigentliche Inhalt:
 #
-# * **Wiedererkennung** -- ein Befund, zu dem schon ein offenes Issue steht,
-#   legt kein zweites an.
-# * **Obergrenze** -- hoechstens fuenf neue Issues pro Lauf, das Schwerere
-#   zuerst.
-# * **Kennzeichnung** -- in jedem Issue steht, dass ein Modell den Befund
-#   gemeldet hat und niemand ihn geprueft hat.
+# * **Ein Issue pro Datei**, dessen Text jeder Lauf neu schreibt. Damit ist
+#   die Wiedererkennung exakt statt geschaetzt -- und es ist egal, wie das
+#   Modell diesmal formuliert. Die erste Fassung erkannte Befunde am Titel
+#   wieder und legte prompt Dubletten an, weil das Modell dieselbe Sache
+#   beim zweiten Lauf anders nannte.
+# * **Obergrenze** -- hoechstens fuenf **neu angelegte** Issues pro Lauf.
+# * **Kennzeichnung** -- in jedem Issue steht, dass ein Modell die Befunde
+#   gemeldet hat und niemand sie geprueft hat.
+#
+# Geschlossen wird nur, was dieser Lauf angesehen hat. Bei einem Push sind
+# das die geaenderten Dateien; die Issues aller anderen bleiben stehen.
 #
 # ## Ohne Secret bleibt er gruen
 #
@@ -27,6 +32,10 @@ name: KI-Pruefer
 
 on:
   push:
+    # **Nur der Hauptzweig.** Ohne diese Einschraenkung laeuft der Pruefer
+    # bei jedem Push auf jeden Arbeitszweig mit -- beim ersten Versuch hat
+    # das die Zahl der Laeufe verdoppelt und prompt Dubletten erzeugt.
+    branches: [main]
   schedule:
     # Taeglich. Beim Ausrollen in weitere Repos wird die Minute verschoben,
     # damit nicht siebzehn Laeufe gleichzeitig anklopfen.
@@ -96,6 +105,7 @@ jobs:
             echo "Voller Durchgang: $(wc -l < kandidaten.txt) Datei(en) im Repo."
           fi
           : > stoff.txt
+          : > angesehen.txt
           zahl=0
           while IFS= read -r datei; do
             case "$datei" in
@@ -112,6 +122,7 @@ jobs:
               echo '```'
               echo
             } >> stoff.txt
+            echo "$datei" >> angesehen.txt
             zahl=$((zahl + 1))
             [ "$(wc -c < stoff.txt)" -gt 40000 ] && break
           done < kandidaten.txt
@@ -149,6 +160,7 @@ jobs:
           set -euo pipefail
           python3 .github/ki-pruefer.py \
             --antwort antwort.txt \
+            --angesehen angesehen.txt \
             --repo "${{ github.repository }}" \
             --lauf "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
