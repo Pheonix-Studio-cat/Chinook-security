@@ -136,28 +136,50 @@ jobs:
             echo "::warning::Der Zusammenhang wurde auf $jetzt Zeichen gekuerzt. Die Antwort kennt den Rest nicht."
           fi
 
+      # **Die CLI direkt, ohne `actions/ai-inference`.**
+      #
+      # Die Action tut nichts anderes, als genau diesen Befehl zu bauen --
+      # aber sie **verschluckt die Fehlerausgabe der CLI** und meldet nur
+      # "exited with code 1. Re-run with ACTIONS_STEP_DEBUG=true". Das ist
+      # eine Meldung, die nichts sagt, und sie hat hier schon zweimal einen
+      # ganzen Lauf gekostet.
+      #
+      # Direkt aufgerufen steht der Grund im Protokoll, beim ersten Mal.
+      # Eine Zwischenschicht, die Fehler verbirgt, ist keine Vereinfachung.
       - name: Frage stellen
         id: ki
-        uses: actions/ai-inference@2c43c91ae16266ca159d311430343c67a5ffa222 # v3
-        with:
-          system-prompt: >-
-            Du beantwortest Fragen über das Repo "Chinook Security" -- ein
-            Werkzeugkasten aus Sicherheits-Bots, die als GitHub Actions laufen.
-            Antworte auf Deutsch, knapp und konkret. Stütze dich
-            ausschliesslich auf den mitgelieferten Zusammenhang. Weisst du
-            etwas nicht, sag das -- erfinde keine Zahlen, keine Dateinamen und
-            keine Commit-SHAs. "Ich weiss es nicht" ist eine vollständige
-            Antwort.
-          prompt-file: frage.txt
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_PAT }}
+        run: |
+          # `set +e`: GitHub startet jeden run-Block mit `bash -e`. Ohne das
+          # Aufheben braeche der Block beim Fehlschlag ab, bevor die Meldung
+          # der CLI ausgegeben wird -- genau das ist hier schon passiert.
+          set +e
+          anweisung='Du beantwortest Fragen über das Repo "Chinook Security" -- ein Werkzeugkasten aus Sicherheits-Bots, die als GitHub Actions laufen. Antworte auf Deutsch, knapp und konkret. Stütze dich ausschliesslich auf den mitgelieferten Zusammenhang. Weisst du etwas nicht, sag das -- erfinde keine Zahlen, keine Dateinamen und keine Commit-SHAs. "Ich weiss es nicht" ist eine vollständige Antwort.'
+          printf '%s\n\n' "$anweisung" > auftrag.txt
+          cat frage.txt >> auftrag.txt
+          copilot -p "$(cat auftrag.txt)" -s --no-ask-user > antwort.txt 2> fehler.txt
+          stand=$?
+          if [ "$stand" -ne 0 ]; then
+            echo "::error::Die Copilot-CLI ist mit Exit $stand ausgestiegen. Ihre eigene Meldung steht direkt darunter."
+            echo "--- Meldung der CLI ---"
+            cat fehler.txt
+            echo "--- Ende ---"
+            exit "$stand"
+          fi
+          # Auch ein Exit 0 kann leer sein. Leer ist kein Ergebnis.
+          if [ ! -s antwort.txt ]; then
+            echo "::error::Die CLI ist ohne Fehler ausgestiegen, hat aber nichts geantwortet."
+            cat fehler.txt
+            exit 1
+          fi
+          echo "Antwort: $(wc -c < antwort.txt) Zeichen."
 
       # Die Antwort gehoert dorthin, wo er sie am iPad sieht: in die
       # Zusammenfassung des Laufs, nicht nur ins Protokoll.
       - name: Antwort anzeigen
         env:
           FRAGE: ${{ inputs.frage }}
-          ANTWORT: ${{ steps.ki.outputs.response }}
         run: |
           set -euo pipefail
           {
@@ -167,7 +189,7 @@ jobs:
             echo
             echo "## Antwort"
             echo
-            printf '%s\n' "$ANTWORT"
+            cat antwort.txt
             echo
             echo "---"
             echo "_Über die Copilot-CLI beantwortet. Die KI hat nur gelesen, nichts geändert._"
