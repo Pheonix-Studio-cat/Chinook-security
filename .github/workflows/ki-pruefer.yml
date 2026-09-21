@@ -32,10 +32,10 @@ name: KI-Pruefer
 
 on:
   push:
-    # **Nur der Hauptzweig.** Ohne diese Einschraenkung laeuft der Pruefer
-    # bei jedem Push auf jeden Arbeitszweig mit -- beim ersten Versuch hat
-    # das die Zahl der Laeufe verdoppelt und prompt Dubletten erzeugt.
-    branches: [main]
+    # Gefiltert wird unten am Job, nicht hier: `branches:` braucht einen
+    # festen Namen, und dieselbe Datei liegt in siebzehn Repos -- eines
+    # davon heisst `master`. `github.event.repository.default_branch` weiss
+    # in jedem, wie sein Hauptzweig heisst.
   schedule:
     # Taeglich. Beim Ausrollen in weitere Repos wird die Minute verschoben,
     # damit nicht siebzehn Laeufe gleichzeitig anklopfen.
@@ -54,6 +54,11 @@ concurrency:
 
 jobs:
   pruefen:
+    # **Bei einem Push nur auf dem Standardzweig.** Ohne diese Bedingung
+    # laeuft der Pruefer bei jedem Push auf jeden Arbeitszweig mit -- beim
+    # ersten Versuch hat das die Zahl der Laeufe verdoppelt und prompt
+    # Dubletten erzeugt. Zeitplan und Knopfdruck sind davon nicht betroffen.
+    if: github.event_name != 'push' || github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
