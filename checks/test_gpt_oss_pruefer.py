@@ -204,7 +204,56 @@ class AntwortLesen(unittest.TestCase):
             bot.befunde_aus_text("Ich habe zwei Probleme gefunden.")
 
 
-class DasKontingentIstDieSchranke(unittest.TestCase):
+class NurHuggingFace(unittest.TestCase):
+    """Festgelegt: **Hugging Face und sonst nichts.**
+
+    Diese Pruefung gibt es, weil sie gefehlt hat. Eine Mutation, die den
+    Endpunkt heimlich auf einen anderen Anbieter umbog, kam ungehindert
+    durch -- der Workflow war geprueft, das Skript nicht. Ein Wechsel des
+    Anbieters ist aber eine Entscheidung, die jemand treffen muss, und sie
+    faellt sonst erst auf, wenn dort ein Konto oder eine Rechnung auftaucht.
+    """
+
+    def test_der_endpunkt_ist_hugging_face(self):
+        self.assertTrue(
+            bot.ENDPUNKT.startswith("https://router.huggingface.co/"),
+            f"der Endpunkt zeigt auf {bot.ENDPUNKT}",
+        )
+
+    def test_kein_fremder_anbieter_im_quelltext(self):
+        with open(_pfad, encoding="utf-8") as datei:
+            text = datei.read()
+        for fremd in ("api.groq.com", "api.openai.com", "api.anthropic.com", "x.ai"):
+            self.assertNotIn(fremd, text, f"{fremd} hat hier nichts zu suchen")
+
+    def test_der_schluessel_heisst_hf_token(self):
+        with open(_pfad, encoding="utf-8") as datei:
+            text = datei.read()
+        self.assertIn("HF_TOKEN", text)
+        self.assertNotIn("GROQ_API_KEY", text)
+
+
+class DasBudgetIstDieSchranke(unittest.TestCase):
+    """0,10 $ im Monat sind die Hauptbedingung, nicht eine Nebenbedingung.
+
+    Siebzehn Repos mal drei Dateien mal vier Wochen sind 204 Pruefungen und
+    damit rund 0,076 $. Vier Dateien waeren schon 0,102 $ -- drueber. Diese
+    Zahl steht deshalb unter Beobachtung: wer sie hochsetzt, zahlt ab der
+    Monatsmitte, und das faellt sonst erst auf, wenn es zu spaet ist.
+    """
+
+    def test_hoechstens_drei_dateien(self):
+        self.assertLessEqual(
+            bot.DATEIEN_JE_LAUF,
+            3,
+            "mehr als drei Dateien pro Lauf sprengen das Monatsguthaben",
+        )
+
+    def test_die_rechnung_geht_auf(self):
+        je_pruefung = 3000 * 0.075 / 1_000_000 + 500 * 0.30 / 1_000_000
+        monat = 17 * bot.DATEIEN_JE_LAUF * 4 * je_pruefung
+        self.assertLess(monat, 0.10, f"gerechnet ${monat:.3f} im Monat")
+
     def test_hoechstens_so_viele_dateien(self):
         viele = [f"x{i}.py" for i in range(40)]
         self.assertEqual(len(bot.dateien_waehlen(viele)), bot.DATEIEN_JE_LAUF)

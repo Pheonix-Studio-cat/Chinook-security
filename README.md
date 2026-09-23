@@ -38,7 +38,7 @@ findings and keeps the bots honest, the **website** and the **weekly run**.
 | **Website** | ✅ generated from the source, GitHub Pages |
 | **Weekly run** | ✅ Mondays, without a commit |
 
-**288 checks, all green. 47 mutations, all caught.**
+**299 checks, all green. 47 mutations, all caught.**
 
 **No dependencies.** The Python standard library only. A security tool with
 three hundred transitive packages is an attack surface itself, and a lockfile
@@ -531,11 +531,12 @@ issues it filed for them are what prompted this rewrite.
 
 ## The second reviewer: gpt-oss-20b, with an evidence requirement
 
-`.github/workflows/gpt-oss-pruefer.yml` runs **`openai/gpt-oss-20b`** over
-the same code. It does not replace the Copilot reviewer — it stands beside
-it. Different model, different failure modes; a finding both report carries
-more weight than one only a single model sees. The two write into separate
-issue streams, and the title says which one spoke.
+`.github/workflows/gpt-oss-pruefer.yml` runs **`openai/gpt-oss-20b`** over the
+same code, through **Hugging Face** — and nothing else. It does not replace the
+Copilot reviewer; it stands beside it. Different model, different failure
+modes; a finding both report carries more weight than one only a single model
+sees. The two write into separate issue streams, and the title says which one
+spoke.
 
 ### What "precise" means here, concretely
 
@@ -543,11 +544,10 @@ Not a longer prompt and not a bigger model. Three things you can **check**:
 
 **One file per request.** The Copilot reviewer sends up to 40 000 characters
 from many files at once; a model answers vaguely about all of them. Here it
-gets one file and nothing else. It is also the only shape that fits the free
-quota (8000 tokens per minute).
+gets one file and nothing else.
 
-**An evidence requirement.** Every finding must carry the **source line** it
-is talking about, and that line is checked against the real file:
+**An evidence requirement.** Every finding must carry the **source line** it is
+talking about, and that line is checked against the real file:
 
 | | |
 | --- | --- |
@@ -555,30 +555,48 @@ is talking about, and that line is checked against the real file:
 | the line is elsewhere in the file | line number is **corrected** |
 | the line is nowhere in the file | finding is **discarded** |
 
-That is a mechanical filter against invention, and it needs no second model
-to judge. A model that claims line 40 contains something it does not either
-did not read the file or made it up — and both are detectable without
-understanding the code.
+A mechanical filter against invention that needs no second model to judge. A
+model claiming line 40 holds something it does not either did not read the file
+or made it up — both detectable without understanding the code.
 
 Measured on a deliberate example: 3 findings reported, 2 verified (one line
 number corrected from 99 to 6), 1 discarded as unfounded.
 
-**No summary without numbers.** How many came back, how many survived the
-evidence check, and why the others did not — all of it is in the log. A
-filter whose effect nobody sees is not a filter.
+**No summary without numbers.** How many came back, how many survived, and why
+the others did not — all in the log. A filter whose effect nobody sees is not a
+filter.
 
-### Why Groq and not the Hugging Face router
+### The budget sets the cadence
 
-The same model, discoverable through Hugging Face either way. But the HF
-router bills against a **$0.10 monthly credit** on a free account — enough
-for a few runs. Groq, one of the six providers serving this model, gives
-**1000 requests and 200 000 tokens a day** without a credit card.
+Hugging Face and nothing else, by decision. A free account has **$0.10 a month**
+in Inference Provider credit. That is not a side constraint, it is *the*
+constraint, and it is calculated rather than guessed:
 
-The 8000-tokens-per-minute ceiling is *why* it asks one file at a time. The
-quota shapes the design; the design is not an accident.
+```
+one file check   ~3000 tokens in, ~500 out       ≈ $0.000375
+$0.10 buys                          about 266 file checks a month
 
-Needs the `GROQ_API_KEY` secret. Without it the run says so and stops
-**without going red**.
+17 repos, daily,  8 files   4080 checks = $1.53   15× over
+17 repos, daily,  3 files   1530 checks = $0.57   over
+17 repos, weekly, 3 files    204 checks = $0.076  fits
+17 repos, weekly, 5 files    340 checks = $0.128  just over
+```
+
+So: **weekly, at most three files per run.** Not modesty — arithmetic. A check
+holds that number, because raising it costs money from mid-month on and that
+only shows up when it is too late.
+
+*Prices are the provider's published rates for this model; what the Hugging
+Face router charges may differ.* Hence the margin — and hence the bot treats an
+exhausted balance (HTTP 402) as **information about the account**, not an
+error: it says so and stops, without going red. A repository blinking red from
+mid-month for no fault of its own teaches you to overlook red.
+
+The router dispatches internally to one of its providers; billing stays with
+Hugging Face, the computation happens elsewhere. Worth saying out loud.
+
+Needs the `HF_TOKEN` secret, with the *Make calls to Inference Providers*
+permission. Without it the run says so and stops **without going red**.
 
 ## The counterproof
 

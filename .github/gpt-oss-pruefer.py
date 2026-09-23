@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Der zweite Prüfer: `openai/gpt-oss-20b`, mit Belegpflicht.
+"""Der zweite Prüfer: `openai/gpt-oss-20b` über Hugging Face, mit Belegpflicht.
 
 Es gibt schon einen KI-Prüfer (Copilot, gpt-4.1). Dieser hier ist nicht
 dessen Ersatz, sondern eine **zweite, unabhängige Meinung** — anderes
@@ -13,9 +13,7 @@ die man **nachrechnen** kann:
 
 **1. Eine Datei pro Anfrage.** Der erste Prüfer schickt bis zu 40 000
 Zeichen aus vielen Dateien auf einmal; das Modell antwortet dann vage über
-alles. Hier bekommt es eine Datei und sonst nichts. Das ist auch die einzige
-Form, die in die Grenze des Gratis-Kontingents passt (8000 Tokens pro
-Minute).
+alles. Hier bekommt es eine Datei und sonst nichts.
 
 **2. Belegpflicht.** Jeder Befund muss die **Quelltextzeile mitliefern**,
 über die er redet. Diese Zeile wird gegen die echte Datei geprüft:
@@ -32,17 +30,31 @@ nicht gibt, hat über nichts Wirkliches geredet.
 überlebten den Beleg, und warum die anderen nicht — das steht im Protokoll.
 Ein Filter, dessen Wirkung niemand sieht, ist kein Filter.
 
-## Warum Groq und nicht der HF-Router
+## Das Budget formt den Takt
 
-Dasselbe Modell, beides über Hugging Face auffindbar. Der Router von
-Hugging Face rechnet aber gegen ein Monatsguthaben von **0,10 $** auf dem
-freien Konto — das reicht für ein paar Läufe. Groq, einer der sechs
-Anbieter dieses Modells, gibt **1000 Anfragen und 200 000 Tokens am Tag**
-ohne Kreditkarte. Bei siebzehn Repos mit je einem Lauf am Tag ist das der
-Unterschied zwischen „läuft" und „läuft bis Dienstag".
+Der Projektinhaber will es über **Hugging Face und sonst nichts**. Das freie
+Konto hat dort **0,10 $ Guthaben im Monat** für Inference Providers. Das ist
+keine Nebenbedingung, sondern die Hauptbedingung, und sie ist gerechnet:
 
-*Unbestätigt, bis ein Lauf es zeigt:* ob das Kontingent im Alltag reicht.
-Die Rechnung steht in `docs/`, die Messung fehlt noch.
+    eine Dateiprüfung  ~3000 Tokens hinein, ~500 hinaus  ≈ $0.000375
+    0,10 $ reichen fuer                      etwa 266 Prüfungen im Monat
+
+    17 Repos, taeglich, 8 Dateien   4080 Prüfungen = $1.53   15-fach drüber
+    17 Repos, taeglich, 3 Dateien   1530 Prüfungen = $0.57   drüber
+    17 Repos, woechentlich, 3       204 Prüfungen = $0.076   passt
+    17 Repos, woechentlich, 5       340 Prüfungen = $0.128   knapp drüber
+
+Deshalb: **wöchentlich, höchstens drei Dateien pro Lauf.** Nicht aus
+Bescheidenheit, sondern weil alles andere die Rechnung sprengt.
+
+*Die Preise stammen von der Anbieterseite für dasselbe Modell; was der
+Router von Hugging Face berechnet, kann davon abweichen.* Deshalb die
+Marge, und deshalb behandelt dieser Prüfer ein erschöpftes Guthaben als
+Auskunft statt als Fehler: er sagt es und hört auf.
+
+Der Router von Hugging Face verteilt die Anfrage intern an einen seiner
+Anbieter — gerechnet und abgerechnet wird sie bei Hugging Face, gerechnet
+im Wortsinn wird sie anderswo. Das gehört dazugesagt.
 
 Keine Abhängigkeiten: Standardbibliothek, wie alles hier.
 """
@@ -57,18 +69,19 @@ import sys
 import urllib.error
 import urllib.request
 
-ENDPUNKT = "https://api.groq.com/openai/v1/chat/completions"
+ENDPUNKT = "https://router.huggingface.co/v1/chat/completions"
 MODELL = "openai/gpt-oss-20b"
 
-# Das Gratis-Kontingent erlaubt 8000 Tokens pro Minute. Eine Datei mit
-# 12 000 Zeichen sind grob 3000 Tokens; dazu der Auftrag und die Antwort,
-# und es passt mit Luft. Groesser werden hiesse: die erste Anfrage geht
-# durch und die zweite bekommt HTTP 429.
+# Eine Datei mit 12 000 Zeichen sind grob 3000 Tokens. Groesser heisst
+# teurer, und teurer heisst bei 0,10 $ im Monat: frueher vorbei.
 ZEICHEN_JE_DATEI = 12000
 
-# Wie viele Dateien ein Lauf hoechstens ansieht. 200 000 Tokens am Tag,
-# geteilt durch siebzehn Repos, laesst pro Lauf Raum fuer wenige Dateien.
-DATEIEN_JE_LAUF = 8
+# Wie viele Dateien ein Lauf hoechstens ansieht. **Drei**, und das ist
+# keine Vorsicht, sondern die Rechnung oben: siebzehn Repos mal drei
+# Dateien mal vier Wochen sind 204 Pruefungen und damit rund 0,076 $ --
+# die einzige Kombination aus Takt und Menge, die in das Monatsguthaben
+# passt. Wer hier hochdreht, zahlt ab der Mitte des Monats.
+DATEIEN_JE_LAUF = 3
 
 QUELLE = "gpt-oss-20b"
 
@@ -244,9 +257,9 @@ def main() -> int:
     )
     werte = zerleger.parse_args()
 
-    schluessel = os.environ.get("GROQ_API_KEY", "")
+    schluessel = os.environ.get("HF_TOKEN", "")
     if not schluessel and not werte.trocken:
-        print("::error::GROQ_API_KEY fehlt.")
+        print("::error::HF_TOKEN fehlt.")
         return 2
 
     with open(werte.dateien, encoding="utf-8") as datei:
@@ -282,12 +295,19 @@ def main() -> int:
             befunde = befunde_aus_text(roh)
         except urllib.error.HTTPError as fehler:
             leib = fehler.read().decode(errors="replace")[:500]
-            print(f"::error::HTTP {fehler.code} von Groq bei {pfad}: {leib}")
-            # 429 heisst Kontingent erschoepft -- das ist eine Auskunft, kein
-            # Fehler dieser Datei. Der Lauf hoert auf, statt weiter anzuklopfen.
-            if fehler.code == 429:
-                print("::warning::Kontingent erschoepft. Der Lauf endet hier.")
+            # 402 heisst: das Monatsguthaben ist aufgebraucht. 429 heisst:
+            # zu schnell. Beides ist eine **Auskunft ueber das Konto**, kein
+            # Fehler dieser Datei und kein Grund, den Lauf rot zu faerben --
+            # sonst blinkt das Repo ab Monatsmitte grundlos rot, und daran
+            # gewoehnt man sich.
+            if fehler.code in (402, 429):
+                print(f"::warning::HTTP {fehler.code} von Hugging Face: {leib[:200]}")
+                print(
+                    "::warning::Guthaben oder Takt erschoepft. Der Lauf endet "
+                    "hier und faerbt sich nicht rot."
+                )
                 break
+            print(f"::error::HTTP {fehler.code} von Hugging Face bei {pfad}: {leib}")
             return 2
         except Unbrauchbar as fehler:
             print(f"::error::Antwort zu {pfad} nicht auswertbar -- {fehler}")

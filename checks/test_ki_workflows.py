@@ -80,7 +80,9 @@ class KiWorkflows(unittest.TestCase):
         """Es gibt zwei: die Action und der direkte Aufruf. Beide gehoeren dazu."""
         namen = {name for name, _t, _x in _mit_ki()}
         self.assertIn("frag-die-ki.yml", namen, "der Knopf faellt aus der Pruefung")
-        self.assertIn("ki-wochenbericht.yml", namen, "der Wochenbericht faellt aus der Pruefung")
+        self.assertIn(
+            "ki-wochenbericht.yml", namen, "der Wochenbericht faellt aus der Pruefung"
+        )
 
     def test_es_gibt_ueberhaupt_einen(self):
         """Ohne diesen Fall pruefen die anderen Tests die leere Menge.
@@ -174,7 +176,7 @@ class DerZweitePruefer(unittest.TestCase):
             return datei.read()
 
     def test_der_schluessel_wird_mitgegeben(self):
-        self.assertIn("GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}", self._text())
+        self.assertIn("HF_TOKEN: ${{ secrets.HF_TOKEN }}", self._text())
 
     def test_er_ruft_den_belegpruefer_auf(self):
         """Ohne dieses Skript gibt es keine Belegpflicht, nur ein Modell."""
@@ -184,10 +186,28 @@ class DerZweitePruefer(unittest.TestCase):
         """Ohne `--quelle` schriebe er dem Copilot-Pruefer die Issues um."""
         self.assertIn("--quelle gpt-oss-20b", self._text())
 
-    def test_er_zeigt_nicht_auf_den_hf_router(self):
-        """Der Router kostet; Groq nicht. Ein stiller Wechsel faellt sonst auf,
-        wenn die Rechnung kommt."""
-        self.assertNotIn("router.huggingface.co", self._text())
+    def test_nur_hugging_face_kein_anderer_anbieter(self):
+        """Festgelegt: Hugging Face und sonst nichts.
+
+        Ein stiller Wechsel auf einen anderen Anbieter waere eine
+        Entscheidung, die niemand getroffen hat -- und sie faellt erst auf,
+        wenn dort ein Konto oder eine Rechnung auftaucht.
+        """
+        text = self._text()
+        for fremd in ("groq.com", "api.openai.com", "api.anthropic.com", "x.ai"):
+            self.assertNotIn(fremd, text, f"{fremd} hat hier nichts zu suchen")
+
+    def test_woechentlich_nicht_taeglich(self):
+        """0,10 $ im Monat lassen nur einen Wochentakt zu -- siehe die
+        Rechnung im Kopf der Datei. Taeglich waere das Fuenffache."""
+        import re as _re
+
+        treffer = _re.search(r"cron:\s*\"([^\"]+)\"", self._text())
+        self.assertIsNotNone(treffer, "kein Zeitplan gefunden")
+        felder = treffer.group(1).split()
+        self.assertNotEqual(
+            felder[4], "*", "taeglich sprengt das Monatsguthaben um das Fuenffache"
+        )
 
     def test_ohne_schluessel_wird_es_nicht_still_gruen(self):
         text = self._text()
