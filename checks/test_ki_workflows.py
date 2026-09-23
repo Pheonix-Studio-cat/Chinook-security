@@ -159,5 +159,41 @@ class KiWorkflows(unittest.TestCase):
             )
 
 
+class DerZweitePruefer(unittest.TestCase):
+    """`gpt-oss-pruefer.yml` benutzt weder die Action noch die Copilot-CLI.
+
+    Ohne eigene Pruefung fiele er damit still aus allen obigen Tests -- und
+    die waeren weiter gruen, ohne ihn je angesehen zu haben. Genau die
+    Luecke, die hier schon dreimal Erfolg vorgetaeuscht hat.
+    """
+
+    def _text(self):
+        pfad = os.path.join(WORKFLOWS, "gpt-oss-pruefer.yml")
+        self.assertTrue(os.path.exists(pfad), "den zweiten Pruefer gibt es nicht mehr")
+        with open(pfad, encoding="utf-8") as datei:
+            return datei.read()
+
+    def test_der_schluessel_wird_mitgegeben(self):
+        self.assertIn("GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}", self._text())
+
+    def test_er_ruft_den_belegpruefer_auf(self):
+        """Ohne dieses Skript gibt es keine Belegpflicht, nur ein Modell."""
+        self.assertIn(".github/gpt-oss-pruefer.py", self._text())
+
+    def test_er_schreibt_in_einen_eigenen_issue_strang(self):
+        """Ohne `--quelle` schriebe er dem Copilot-Pruefer die Issues um."""
+        self.assertIn("--quelle gpt-oss-20b", self._text())
+
+    def test_er_zeigt_nicht_auf_den_hf_router(self):
+        """Der Router kostet; Groq nicht. Ein stiller Wechsel faellt sonst auf,
+        wenn die Rechnung kommt."""
+        self.assertNotIn("router.huggingface.co", self._text())
+
+    def test_ohne_schluessel_wird_es_nicht_still_gruen(self):
+        text = self._text()
+        self.assertIn("::warning::", text)
+        self.assertIn("::error::", text)
+
+
 if __name__ == "__main__":
     unittest.main()

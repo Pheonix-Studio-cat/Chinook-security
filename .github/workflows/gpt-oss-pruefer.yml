@@ -1,0 +1,145 @@
+# Der zweite Pruefer: `openai/gpt-oss-20b` mit Belegpflicht.
+#
+# Er ersetzt den Copilot-Pruefer nicht, er steht daneben. **Anderes Modell,
+# andere Fehler** -- und ein Befund, den beide melden, wiegt schwerer als
+# einer, den nur eines meldet. Beide schreiben in getrennte Issue-Straenge;
+# der Titel sagt, wer geredet hat.
+#
+# ## Was hier "aufs genaueste" heisst
+#
+# **Eine Datei pro Anfrage, mit Belegpflicht.** Jeder Befund muss die
+# Quelltextzeile mitliefern, ueber die er redet, und die wird gegen die
+# echte Datei geprueft: sitzt sie -> gilt; sitzt sie woanders ->
+# Zeilennummer wird korrigiert; steht sie nirgends -> **verworfen**.
+#
+# Das ist ein mechanischer Filter gegen Erfundenes. Ein Modell, das eine
+# Zeile erfindet, die es nicht gibt, hat ueber nichts Wirkliches geredet --
+# und das laesst sich feststellen, ohne den Code zu verstehen.
+#
+# ## Warum Groq und nicht der Router von Hugging Face
+#
+# Dasselbe Modell, beides ueber Hugging Face auffindbar. Der HF-Router
+# rechnet auf dem freien Konto gegen **0,10 $ Monatsguthaben**; Groq, einer
+# der sechs Anbieter dieses Modells, gibt **1000 Anfragen und 200 000
+# Tokens am Tag** ohne Kreditkarte.
+#
+# Die Grenze von **8000 Tokens pro Minute** ist der Grund fuer "eine Datei
+# pro Anfrage": 40 000 Zeichen am Stueck wie beim Copilot-Pruefer gingen
+# hier nicht durch.
+#
+# ## Ohne Secret bleibt er gruen
+#
+# Fehlt `GROQ_API_KEY`, sagt der Lauf das und hoert auf -- ohne rot zu
+# werden. Beim Knopfdruck von Hand ist es umgekehrt: da ist eine Absage
+# die Antwort.
+name: GPT-OSS-Pruefer
+
+on:
+  schedule:
+    # Versetzt zum Copilot-Pruefer (04:40): zwei Modelle, die gleichzeitig
+    # dieselben Issues anfassen, sind eine vermeidbare Wettlaufsituation.
+    - cron: "25 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: gpt-oss-pruefer-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Ist der Schluessel hinterlegt?
+        id: schluessel
+        env:
+          KEY: ${{ secrets.GROQ_API_KEY }}
+          VON_HAND: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEY:-}" ]; then
+            echo "weiter=nein" >> "$GITHUB_OUTPUT"
+            hinweis="Das Secret GROQ_API_KEY fehlt. Kostenloser Schluessel unter console.groq.com, dann Settings -> Secrets and variables -> Actions."
+            if [ "$VON_HAND" = "true" ]; then
+              echo "::error::$hinweis"
+              exit 1
+            fi
+            echo "::warning::$hinweis Der Lauf hoert hier auf, ohne rot zu werden."
+            exit 0
+          fi
+          echo "weiter=ja" >> "$GITHUB_OUTPUT"
+          echo "Schluessel ist hinterlegt."
+
+      - name: Welche Dateien?
+        id: stoff
+        if: steps.schluessel.outputs.weiter == 'ja'
+        run: |
+          set -euo pipefail
+          : > kandidaten.txt
+          while IFS= read -r datei; do
+            case "$datei" in
+              *.py|*.js|*.ts|*.tsx|*.jsx|*.go|*.rb|*.java|*.sh|*.php|*.cs|*.rs) ;;
+              *) continue ;;
+            esac
+            [ -f "$datei" ] || continue
+            echo "$datei" >> kandidaten.txt
+          done < <(git ls-files)
+          zahl=$(wc -l < kandidaten.txt)
+          echo "dateien=$zahl" >> "$GITHUB_OUTPUT"
+          echo "$zahl Quelldatei(en) im Repo."
+
+      - name: Fragen und Belege pruefen
+        if: steps.schluessel.outputs.weiter == 'ja' && steps.stoff.outputs.dateien != '0'
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          set -euo pipefail
+          python3 .github/gpt-oss-pruefer.py \
+            --dateien kandidaten.txt \
+            --ausgabe befunde.json
+
+      - name: Befunde zu Issues machen
+        if: steps.schluessel.outputs.weiter == 'ja' && steps.stoff.outputs.dateien != '0'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 .github/ki-pruefer.py \
+            --antwort befunde.json \
+            --angesehen angesehen.txt \
+            --quelle gpt-oss-20b \
+            --repo "${{ github.repository }}" \
+            --lauf "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      # **Kein `if:`.** Dieser Schritt sagt immer, was der Lauf getan hat --
+      # auch wenn er nichts getan hat.
+      - name: Was ist passiert?
+        if: always()
+        env:
+          WEITER: ${{ steps.schluessel.outputs.weiter }}
+          DATEIEN: ${{ steps.stoff.outputs.dateien }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## GPT-OSS-Prüfer"
+            echo
+            if [ "${WEITER:-nein}" != "ja" ]; then
+              echo "**Nichts geprüft: das Secret \`GROQ_API_KEY\` fehlt.**"
+              echo
+              echo "Kostenloser Schlüssel unter *console.groq.com*, dann"
+              echo "*Settings → Secrets and variables → Actions*."
+            elif [ "${DATEIEN:-0}" = "0" ]; then
+              echo "Keine Quelldatei zum Ansehen."
+            else
+              echo "$DATEIEN Quelldatei(en) im Repo; wie viele davon angesehen wurden,"
+              echo "steht im Protokoll — das Tageskontingent ist die Schranke."
+              echo
+              echo "Jeder Befund musste die Quelltextzeile mitliefern, über die er redet."
+              echo "Was sich nicht belegen liess, steht als \`VERWORFEN\` im Protokoll."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

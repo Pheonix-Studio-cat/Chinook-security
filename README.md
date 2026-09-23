@@ -38,7 +38,7 @@ findings and keeps the bots honest, the **website** and the **weekly run**.
 | **Website** | ✅ generated from the source, GitHub Pages |
 | **Weekly run** | ✅ Mondays, without a commit |
 
-**255 checks, all green. 47 mutations, all caught.**
+**288 checks, all green. 47 mutations, all caught.**
 
 **No dependencies.** The Python standard library only. A security tool with
 three hundred transitive packages is an attack surface itself, and a lockfile
@@ -528,6 +528,57 @@ The bot's first real run found three genuine bugs in the bot itself: no
 de-duplication within a single answer, a crash on non-string fields, and
 recognition going blind past 500 open issues. All three are fixed, and the
 issues it filed for them are what prompted this rewrite.
+
+## The second reviewer: gpt-oss-20b, with an evidence requirement
+
+`.github/workflows/gpt-oss-pruefer.yml` runs **`openai/gpt-oss-20b`** over
+the same code. It does not replace the Copilot reviewer — it stands beside
+it. Different model, different failure modes; a finding both report carries
+more weight than one only a single model sees. The two write into separate
+issue streams, and the title says which one spoke.
+
+### What "precise" means here, concretely
+
+Not a longer prompt and not a bigger model. Three things you can **check**:
+
+**One file per request.** The Copilot reviewer sends up to 40 000 characters
+from many files at once; a model answers vaguely about all of them. Here it
+gets one file and nothing else. It is also the only shape that fits the free
+quota (8000 tokens per minute).
+
+**An evidence requirement.** Every finding must carry the **source line** it
+is talking about, and that line is checked against the real file:
+
+| | |
+| --- | --- |
+| the line is where it says | finding stands |
+| the line is elsewhere in the file | line number is **corrected** |
+| the line is nowhere in the file | finding is **discarded** |
+
+That is a mechanical filter against invention, and it needs no second model
+to judge. A model that claims line 40 contains something it does not either
+did not read the file or made it up — and both are detectable without
+understanding the code.
+
+Measured on a deliberate example: 3 findings reported, 2 verified (one line
+number corrected from 99 to 6), 1 discarded as unfounded.
+
+**No summary without numbers.** How many came back, how many survived the
+evidence check, and why the others did not — all of it is in the log. A
+filter whose effect nobody sees is not a filter.
+
+### Why Groq and not the Hugging Face router
+
+The same model, discoverable through Hugging Face either way. But the HF
+router bills against a **$0.10 monthly credit** on a free account — enough
+for a few runs. Groq, one of the six providers serving this model, gives
+**1000 requests and 200 000 tokens a day** without a credit card.
+
+The 8000-tokens-per-minute ceiling is *why* it asks one file at a time. The
+quota shapes the design; the design is not an accident.
+
+Needs the `GROQ_API_KEY` secret. Without it the run says so and stops
+**without going red**.
 
 ## The counterproof
 
