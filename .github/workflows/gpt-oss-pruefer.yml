@@ -1,0 +1,157 @@
+# Der zweite Pruefer: `openai/gpt-oss-20b` mit Belegpflicht.
+#
+# Er ersetzt den Copilot-Pruefer nicht, er steht daneben. **Anderes Modell,
+# andere Fehler** -- und ein Befund, den beide melden, wiegt schwerer als
+# einer, den nur eines meldet. Beide schreiben in getrennte Issue-Straenge;
+# der Titel sagt, wer geredet hat.
+#
+# ## Was hier "aufs genaueste" heisst
+#
+# **Eine Datei pro Anfrage, mit Belegpflicht.** Jeder Befund muss die
+# Quelltextzeile mitliefern, ueber die er redet, und die wird gegen die
+# echte Datei geprueft: sitzt sie -> gilt; sitzt sie woanders ->
+# Zeilennummer wird korrigiert; steht sie nirgends -> **verworfen**.
+#
+# Das ist ein mechanischer Filter gegen Erfundenes. Ein Modell, das eine
+# Zeile erfindet, die es nicht gibt, hat ueber nichts Wirkliches geredet --
+# und das laesst sich feststellen, ohne den Code zu verstehen.
+#
+# ## Das Budget formt den Takt
+#
+# Ueber **Hugging Face und sonst nichts** -- so entschieden. Das freie
+# Konto hat dort 0,10 $ Guthaben im Monat. Das ist keine Nebenbedingung,
+# sondern die Hauptbedingung, und sie ist gerechnet:
+#
+#     17 Repos, taeglich  8 Dateien -> $1.53    15-fach drueber
+#     17 Repos, taeglich  3 Dateien -> $0.57    drueber
+#     17 Repos, woechentl. 3 Dateien -> $0.076  passt
+#     17 Repos, woechentl. 5 Dateien -> $0.128  knapp drueber
+#
+# Deshalb **woechentlich und hoechstens drei Dateien**. Nicht aus
+# Bescheidenheit, sondern weil alles andere die Rechnung sprengt.
+#
+# Ist das Guthaben doch aufgebraucht, antwortet Hugging Face mit HTTP 402.
+# Das ist eine **Auskunft ueber das Konto**, kein Fehler dieses Repos: der
+# Lauf sagt es und hoert auf, ohne rot zu werden. Sonst blinkte das Repo ab
+# Monatsmitte grundlos rot -- und daran gewoehnt man sich.
+#
+# ## Ohne Secret bleibt er gruen
+#
+# Fehlt `HF_TOKEN`, sagt der Lauf das und hoert auf -- ohne rot zu werden.
+# Beim Knopfdruck von Hand ist es umgekehrt: da ist eine Absage die
+# Antwort.
+name: GPT-OSS-Pruefer
+
+on:
+  schedule:
+    # **Woechentlich**, nicht taeglich -- siehe die Rechnung oben. Sonntags,
+    # und versetzt zum Copilot-Pruefer (04:40): zwei Modelle, die
+    # gleichzeitig dieselben Issues anfassen, sind eine vermeidbare
+    # Wettlaufsituation.
+    - cron: "25 5 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: gpt-oss-pruefer-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Ist der Schluessel hinterlegt?
+        id: schluessel
+        env:
+          KEY: ${{ secrets.HF_TOKEN }}
+          VON_HAND: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEY:-}" ]; then
+            echo "weiter=nein" >> "$GITHUB_OUTPUT"
+            hinweis="Das Secret HF_TOKEN fehlt. Zu erzeugen unter huggingface.co -> Settings -> Access Tokens, mit dem Recht 'Make calls to Inference Providers'. Dann Settings -> Secrets and variables -> Actions."
+            if [ "$VON_HAND" = "true" ]; then
+              echo "::error::$hinweis"
+              exit 1
+            fi
+            echo "::warning::$hinweis Der Lauf hoert hier auf, ohne rot zu werden."
+            exit 0
+          fi
+          echo "weiter=ja" >> "$GITHUB_OUTPUT"
+          echo "Schluessel ist hinterlegt."
+
+      - name: Welche Dateien?
+        id: stoff
+        if: steps.schluessel.outputs.weiter == 'ja'
+        run: |
+          set -euo pipefail
+          : > kandidaten.txt
+          while IFS= read -r datei; do
+            case "$datei" in
+              *.py|*.js|*.ts|*.tsx|*.jsx|*.go|*.rb|*.java|*.sh|*.php|*.cs|*.rs) ;;
+              *) continue ;;
+            esac
+            [ -f "$datei" ] || continue
+            echo "$datei" >> kandidaten.txt
+          done < <(git ls-files)
+          zahl=$(wc -l < kandidaten.txt)
+          echo "dateien=$zahl" >> "$GITHUB_OUTPUT"
+          echo "$zahl Quelldatei(en) im Repo."
+
+      - name: Fragen und Belege pruefen
+        if: steps.schluessel.outputs.weiter == 'ja' && steps.stoff.outputs.dateien != '0'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 .github/gpt-oss-pruefer.py \
+            --dateien kandidaten.txt \
+            --ausgabe befunde.json
+
+      - name: Befunde zu Issues machen
+        if: steps.schluessel.outputs.weiter == 'ja' && steps.stoff.outputs.dateien != '0'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 .github/ki-pruefer.py \
+            --antwort befunde.json \
+            --angesehen angesehen.txt \
+            --quelle gpt-oss-20b \
+            --repo "${{ github.repository }}" \
+            --lauf "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      # **Kein `if:`.** Dieser Schritt sagt immer, was der Lauf getan hat --
+      # auch wenn er nichts getan hat.
+      - name: Was ist passiert?
+        if: always()
+        env:
+          WEITER: ${{ steps.schluessel.outputs.weiter }}
+          DATEIEN: ${{ steps.stoff.outputs.dateien }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## GPT-OSS-Prüfer"
+            echo
+            if [ "${WEITER:-nein}" != "ja" ]; then
+              echo "**Nichts geprüft: das Secret \`HF_TOKEN\` fehlt.**"
+              echo
+              echo "Zu erzeugen unter *huggingface.co → Settings → Access Tokens*,"
+              echo "mit dem Recht *Make calls to Inference Providers*. Dann"
+              echo "*Settings → Secrets and variables → Actions*."
+            elif [ "${DATEIEN:-0}" = "0" ]; then
+              echo "Keine Quelldatei zum Ansehen."
+            else
+              echo "$DATEIEN Quelldatei(en) im Repo; **höchstens drei** davon werden"
+              echo "angesehen — das Monatsguthaben von 0,10 \$ ist die Schranke, und"
+              echo "wöchentlich mal drei ist die einzige Kombination, die hineinpasst."
+              echo
+              echo "Jeder Befund musste die Quelltextzeile mitliefern, über die er redet."
+              echo "Was sich nicht belegen liess, steht als \`VERWORFEN\` im Protokoll."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

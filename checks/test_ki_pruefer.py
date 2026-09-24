@@ -187,6 +187,65 @@ class DerPlan(unittest.TestCase):
         self.assertEqual(zurueck, 0)
 
 
+class ZweiQuellenStoerenEinanderNicht(unittest.TestCase):
+    """Zwei Modelle pruefen dasselbe Repo.
+
+    Ohne Trennung schriebe der eine dem anderen das Issue um, und dort
+    stuende im Wechsel mal das eine, mal das andere Ergebnis. Ein Issue,
+    das bei jedem Lauf etwas anderes behauptet, ist schlimmer als zwei.
+    """
+
+    def test_marken_unterscheiden_sich(self):
+        self.assertNotEqual(
+            pruefer.marke_von("a.py", "copilot"),
+            pruefer.marke_von("a.py", "gpt-oss-20b"),
+        )
+
+    def test_titel_unterscheiden_sich(self):
+        self.assertNotEqual(
+            pruefer.titel_von("a.py", "copilot"),
+            pruefer.titel_von("a.py", "gpt-oss-20b"),
+        )
+
+    def test_fremdes_issue_wird_uebergangen(self):
+        fremd = pruefer.issue_text("a.py", [_befund()], "o/r", "u", "gpt-oss-20b")
+        gesehen = pruefer.dateien_aus_issues([{"body": fremd, "number": 9}], "copilot")
+        self.assertEqual(gesehen, {}, "copilot darf das Issue von gpt-oss nicht sehen")
+
+    def test_eigenes_issue_wird_gefunden(self):
+        eigen = pruefer.issue_text("a.py", [_befund()], "o/r", "u", "gpt-oss-20b")
+        gesehen = pruefer.dateien_aus_issues(
+            [{"body": eigen, "number": 9}], "gpt-oss-20b"
+        )
+        self.assertEqual(list(gesehen), ["a.py"])
+
+    def test_fremdes_issue_wird_nicht_geschlossen(self):
+        """Der gefaehrlichste Fall: A findet nichts und raeumt B ab."""
+        fremd = pruefer.issue_text("a.py", [_befund()], "o/r", "u", "gpt-oss-20b")
+        bestehend = pruefer.dateien_aus_issues(
+            [{"body": fremd, "number": 9}], "copilot"
+        )
+        _a, _b, schliessen, _z = pruefer.plan({}, bestehend, ["a.py"])
+        self.assertEqual(schliessen, [])
+
+    def test_quelle_steht_im_issue(self):
+        text = pruefer.issue_text("a.py", [_befund()], "o/r", "u", "gpt-oss-20b")
+        self.assertIn("gpt-oss-20b", text)
+
+
+class DerBelegStehtImIssue(unittest.TestCase):
+    """Der zweite Pruefer liefert Belege mit. Die gehoeren sichtbar hinein."""
+
+    def test_beleg_wird_gezeigt(self):
+        befund = dict(_befund(), beleg="    return a / b")
+        text = pruefer.issue_text("a.py", [befund], "o/r", "u")
+        self.assertIn("return a / b", text)
+
+    def test_ohne_beleg_kein_leerer_block(self):
+        text = pruefer.issue_text("a.py", [_befund()], "o/r", "u")
+        self.assertNotIn("```\n```", text)
+
+
 class Kennzeichnung(unittest.TestCase):
     def test_der_warnhinweis_steht_drin(self):
         self.assertIn("Niemand hat das geprüft", pruefer.issue_text("a.py", [_befund()], "o/r", "u"))
